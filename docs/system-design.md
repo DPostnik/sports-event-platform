@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md). One question is still open; see Open questions.
 
 ## Scope of this version
 
@@ -246,6 +246,16 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 - Sports are identified by their stable code.
 - Every event also stores the `source` that wrote it and that source's `external_id`. The pair is unique and makes create idempotent. See [ADR-0007](adr/0007-source-identity.md).
 
+## Change propagation
+
+Consumers poll, and conditional requests make polling cheap. Publishing change events through a transactional outbox is described, not built ([ADR-0020](adr/0020-change-propagation.md)).
+
+## Implementation boundary
+
+The design describes a platform. The implementation is one service. [ADR-0021](adr/0021-implementation-boundary.md) places every part in one of three categories: built, extension point, described.
+
+Not built, in short: provider adapters, reconciliation, change events, match actions, load balancer and CDN, database replicas and failover, authentication and rate limiting.
+
 ## Open questions
 
 | #  | Question                                                                                                  | Why it matters |
@@ -260,7 +270,7 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 | 8  | Closed by [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md) and [ADR-0016](adr/0016-failure-modes.md). ~~Cache: final TTL, invalidation after writes, what "fresh" means during a database outage.~~ | These rules set how stale a reader can see data. |
 | 9  | Closed by [ADR-0017](adr/0017-rest-api.md) and [ADR-0018](adr/0018-error-format.md). ~~API style and error format.~~ | Consumers depend on a stable contract. |
 | 10 | Tooling: database, query layer, HTTP framework, test tools.                                               | Each tool choice must be justified. |
-| 11 | How consumers learn about changes (polling only vs. published change events).                             | It changes the load estimate and the write path. |
-| 12 | Partly answered by [ADR-0008](adr/0008-ingestion-boundary.md) for adapters and reconciliation. Implementation boundary: which parts are code, which are extension points, which are described only.      | It sets the scope of the work. |
+| 11 | Closed by [ADR-0020](adr/0020-change-propagation.md). ~~How consumers learn about changes (polling only vs. published change events).~~ | It changes the load estimate and the write path. |
+| 12 | Closed by [ADR-0021](adr/0021-implementation-boundary.md). ~~Implementation boundary: which parts are code, which are extension points, which are described only.~~ | It sets the scope of the work. |
 
 Each question is closed by its own commit that adds a decision record under `docs/adr/` and updates this document.

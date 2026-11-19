@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -90,9 +90,13 @@ sequenceDiagram
 
 ### Status update
 
-1. The API receives a status update with `expectedVersion`.
-2. The write is conditional on a transition allowed by the [event lifecycle](#event-lifecycle) and on `expectedVersion`.
-3. On success, the version advances.
+1. The writer reads the event and learns its version.
+2. The API receives a status update with `expectedVersion`.
+3. One conditional statement applies the write only if the transition is allowed by the [event lifecycle](#event-lifecycle) and `expectedVersion` equals the stored version.
+4. On success, the version advances by 1.
+5. On a version mismatch, the API refuses the change with a conflict that carries the current version. The writer reads again and decides again.
+
+The rule is the same for every writer, see [ADR-0009](adr/0009-optimistic-concurrency.md).
 
 ### Failure modes
 
@@ -212,7 +216,7 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 | 3  | Closed by [ADR-0003](adr/0003-sports-and-competitors.md) and [ADR-0004](adr/0004-sport-specific-phase.md). ~~Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity?~~ | It shapes the schema and the type model. |
 | 4  | Closed by [ADR-0005](adr/0005-time-in-utc.md) and [ADR-0006](adr/0006-identifiers.md). ~~Time model (UTC instant only vs. plus venue time zone) and ID strategy.~~ | Schedules and list windows depend on how time and identity are stored. |
 | 5  | Closed by [ADR-0007](adr/0007-source-identity.md) and [ADR-0008](adr/0008-ingestion-boundary.md). ~~Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.~~ | A retry is covered by the request identity; other duplicates are not. |
-| 6  | Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).        | Defines the conflict behavior and the set of write operations. |
+| 6  | Partly closed by [ADR-0009](adr/0009-optimistic-concurrency.md). ~~Update: response on a stale `expectedVersion`~~ Still open: updates other than status (for example reschedule). | Defines the conflict behavior and the set of write operations. |
 | 7  | List queries: which filters are supported, pagination style (v1 uses a page number), which indexes back them. | Filters and paging decide cache keys and database load. |
 | 8  | Cache: final TTL, invalidation after writes, what "fresh" means during a database outage.                 | These rules set how stale a reader can see data. |
 | 9  | API style and error format.                                                                               | Consumers depend on a stable contract. |

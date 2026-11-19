@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -73,7 +73,7 @@ There are two read operations ([ADR-0011](adr/0011-read-queries.md)): one event 
 2. The API checks the shared cache first.
 3. On a miss, the API reads from the database and populates the cache.
 4. The list cache key contains the filters and the cursor.
-5. The cache TTL is 60 seconds. This value is tentative.
+5. A list page expires after 60 seconds. One event is deleted from the cache when it changes, with a 60-second expiry as a safety net ([ADR-0014](adr/0014-cache-freshness.md)).
 
 ### Create
 
@@ -101,7 +101,7 @@ sequenceDiagram
 1. The writer reads the event and learns its version.
 2. The API receives one of the six commands with `expectedVersion`.
 3. One conditional statement applies the write only if the transition is allowed by the [event lifecycle](#event-lifecycle) and `expectedVersion` equals the stored version.
-4. On success, the version advances by 1.
+4. On success, the version advances by 1. After the commit, the API deletes the cache entry of the event.
 5. On a version mismatch, the API refuses the change with a conflict that carries the current version. The writer reads again and decides again.
 
 The rule is the same for every writer, see [ADR-0009](adr/0009-optimistic-concurrency.md).
@@ -139,7 +139,7 @@ The numbers and their basis are in [ADR-0001](adr/0001-load-assumptions.md).
 | Read rate, average | 2,400 requests per second |
 | Read rate, peak | 10,000 to 12,000 requests per second |
 | Acceptable staleness, lists | up to 60 seconds |
-| Acceptable staleness, single event | up to 5 seconds |
+| Acceptable staleness, single event | none in the normal case, up to 60 seconds after a lost cache delete ([ADR-0014](adr/0014-cache-freshness.md)) |
 
 Average case:
 
@@ -237,7 +237,7 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 | 5  | Closed by [ADR-0007](adr/0007-source-identity.md) and [ADR-0008](adr/0008-ingestion-boundary.md). ~~Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.~~ | A retry is covered by the request identity; other duplicates are not. |
 | 6  | Closed by [ADR-0009](adr/0009-optimistic-concurrency.md) and [ADR-0010](adr/0010-write-commands.md). ~~Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).~~ | Defines the conflict behavior and the set of write operations. |
 | 7  | Closed by [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md) and [ADR-0013](adr/0013-indexes.md). ~~List queries: which filters are supported, pagination style (v1 uses a page number), which indexes back them.~~ | Filters and paging decide cache keys and database load. |
-| 8  | Cache: final TTL, invalidation after writes, what "fresh" means during a database outage.                 | These rules set how stale a reader can see data. |
+| 8  | Partly closed by [ADR-0014](adr/0014-cache-freshness.md). ~~Cache: final TTL, invalidation after writes~~ Still open: where the cache runs, behaviour during a cache or database outage, what "fresh" means during a database outage. | These rules set how stale a reader can see data. |
 | 9  | API style and error format.                                                                               | Consumers depend on a stable contract. |
 | 10 | Tooling: database, query layer, HTTP framework, test tools.                                               | Each tool choice must be justified. |
 | 11 | How consumers learn about changes (polling only vs. published change events).                             | It changes the load estimate and the write path. |

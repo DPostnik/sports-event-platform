@@ -23,7 +23,7 @@ The service is sized for these values.
 | Read rate, average | 2,400 requests per second | Estimate: 24,000 concurrent viewers polling every 10 seconds |
 | Read rate, peak | 10,000 to 12,000 requests per second | Estimate: factor 5 on a major tournament day |
 | Acceptable staleness, lists | up to 60 seconds | The interview process described this data as refreshed within minutes, not at betting latency |
-| Acceptable staleness, single event | up to 5 seconds | Estimate |
+| Acceptable staleness, single event | up to 5 seconds | Estimate. Later replaced by [ADR-0014](0014-cache-freshness.md) |
 
 Values marked as estimates are the author's assumptions, not Sportradar data. Real traffic figures are not public. The direct consumers are likely backend systems of media companies that cache on their side, so real load may be lower and burstier.
 

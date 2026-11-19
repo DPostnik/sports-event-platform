@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -167,13 +167,26 @@ stateDiagram-v2
 - Transitions come only from producer commands. The service does not change status by its own clock.
 - Every change advances the version.
 
+### Live phase
+
+An event in status `live` may carry a sport-specific phase, defined in [ADR-0004](adr/0004-sport-specific-phase.md).
+
+| Sport | Phases |
+| ----- | ------ |
+| football | `1st_half`, `2nd_half` |
+| ice_hockey | `1st_period`, `2nd_period`, `3rd_period` |
+| any other sport | no phase (always absent) |
+
+- The phase exists only while the event is `live`.
+- The generic status is complete on its own. Consumers may ignore the phase.
+
 ## Open questions
 
 | #  | Question                                                                                                  | Why it matters |
 | -- | --------------------------------------------------------------------------------------------------------- | -------------- |
 | 1  | Closed by [ADR-0001](adr/0001-load-assumptions.md). ~~Load assumptions: are viewer count, polling interval and read/write ratio the right basis?~~ | The load estimate drives cache, pool and capacity choices. |
 | 2  | Closed by [ADR-0002](adr/0002-event-lifecycle.md). ~~Domain model: exact status set, allowed transitions, terminal states.~~ | Conditional status updates need a defined set of allowed states. |
-| 3  | Partly closed by [ADR-0003](adr/0003-sports-and-competitors.md). ~~Is Team a separate entity with its own identity? How are sports represented?~~ Still open: how sport-specific data are represented. | It shapes the schema and the type model. |
+| 3  | Closed by [ADR-0003](adr/0003-sports-and-competitors.md) and [ADR-0004](adr/0004-sport-specific-phase.md). ~~Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity?~~ | It shapes the schema and the type model. |
 | 4  | Time model (UTC instant only vs. plus venue time zone) and ID strategy.                                   | Schedules and list windows depend on how time and identity are stored. |
 | 5  | Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.               | A retry is covered by the request identity; other duplicates are not. |
 | 6  | Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).        | Defines the conflict behavior and the set of write operations. |

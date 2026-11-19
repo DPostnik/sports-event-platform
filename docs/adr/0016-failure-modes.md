@@ -67,4 +67,4 @@ A cache entry has two ages.
 - A cancelled event can still be served as scheduled, with the stale mark, during a database outage.
 - The in-flight promise map and the pool are per-instance state that lives only for the duration of requests. The service stays stateless across requests.
 - The tests must cover: many concurrent identical requests cause one database read; a cache failure does not fail the request; a database failure serves marked stale data and refuses writes.
-- How the stale mark and the "overloaded" and "unavailable" answers look in the API is open question 9.
+- The "overloaded" and "unavailable" answers are defined in [ADR-0018](0018-error-format.md). The stale mark became a timestamp and standard headers, not a flag, in [ADR-0019](0019-response-shape.md).

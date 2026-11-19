@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -125,7 +125,7 @@ The rules are defined in [ADR-0016](adr/0016-failure-modes.md).
 | ------- | --------- |
 | A popular cache entry expires | Concurrent requests for one key inside an instance share one in-flight database read. Always on. |
 | The cache is down | Reads go to the database. A fixed connection pool with a short wait caps the load; excess requests are refused as overloaded. |
-| The database is down | Cached entries up to 1 hour old are served, marked as possibly stale when older than 60 seconds. Reads without an entry and all writes are refused as unavailable. |
+| The database is down | Cached entries up to 1 hour old are served. Their age is visible in `generatedAt` and the `Age` header. Reads without an entry and all writes are refused as unavailable. |
 
 Described, not built: a cache of a few seconds inside each instance for a shared-cache outage, and a standby database with automatic failover.
 
@@ -141,6 +141,8 @@ The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)).
 | Six write commands | `POST /events/{id}/start`, `/finish`, `/postpone`, `/reschedule`, `/cancel`, `/phase` |
 
 Every error uses one format, RFC 9457 Problem Details, with a stable `code` ([ADR-0018](adr/0018-error-format.md)).
+
+A success response has `generatedAt` at the top and the payload under `event` or `events`. Freshness is stated with `Cache-Control`, `ETag` and `Age`. There is no envelope and no stale flag ([ADR-0019](adr/0019-response-shape.md)).
 
 ## Load and volume assumptions
 

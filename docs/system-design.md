@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -180,6 +180,14 @@ An event in status `live` may carry a sport-specific phase, defined in [ADR-0004
 - The phase exists only while the event is `live`.
 - The generic status is complete on its own. Consumers may ignore the phase.
 
+## Time
+
+The time model is defined in [ADR-0005](adr/0005-time-in-utc.md).
+
+- An event start is one instant, stored as `timestamptz`.
+- The API returns time only in UTC, ISO 8601 with `Z`.
+- Input must carry an explicit offset or `Z`. Input without a zone is rejected.
+
 ## Open questions
 
 | #  | Question                                                                                                  | Why it matters |
@@ -187,7 +195,7 @@ An event in status `live` may carry a sport-specific phase, defined in [ADR-0004
 | 1  | Closed by [ADR-0001](adr/0001-load-assumptions.md). ~~Load assumptions: are viewer count, polling interval and read/write ratio the right basis?~~ | The load estimate drives cache, pool and capacity choices. |
 | 2  | Closed by [ADR-0002](adr/0002-event-lifecycle.md). ~~Domain model: exact status set, allowed transitions, terminal states.~~ | Conditional status updates need a defined set of allowed states. |
 | 3  | Closed by [ADR-0003](adr/0003-sports-and-competitors.md) and [ADR-0004](adr/0004-sport-specific-phase.md). ~~Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity?~~ | It shapes the schema and the type model. |
-| 4  | Time model (UTC instant only vs. plus venue time zone) and ID strategy.                                   | Schedules and list windows depend on how time and identity are stored. |
+| 4  | Partly closed by [ADR-0005](adr/0005-time-in-utc.md). ~~Time model (UTC instant only vs. plus venue time zone)~~ Still open: ID strategy. | Schedules and list windows depend on how time and identity are stored. |
 | 5  | Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.               | A retry is covered by the request identity; other duplicates are not. |
 | 6  | Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).        | Defines the conflict behavior and the set of write operations. |
 | 7  | List queries: which filters are supported, pagination style (v1 uses a page number), which indexes back them. | Filters and paging decide cache keys and database load. |

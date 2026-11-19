@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -12,6 +12,11 @@ Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [AD
 
 ```mermaid
 flowchart LR
+    Providers[Providers] --> Adapters
+    subgraph Upstream["Upstream - described, not built"]
+        Adapters["Adapters (one per provider)"] --> Recon[Reconciliation]
+    end
+    Recon --> LB
     Web[Web clients] --> LB[Load balancer]
     Mobile[Mobile clients] --> LB
     Internal[Internal services] --> LB
@@ -27,6 +32,8 @@ flowchart LR
 ```
 
 - Consumers: web, mobile and internal services that read and change matches.
+- Adapters: one small component per provider. Each converts the provider format into the canonical format. Described, not built.
+- Reconciliation: decides whether records from different providers are the same real match, and whose data wins. Described, not built.
 - Load balancer: spreads requests across the API instances.
 - API service: one service, run as several identical instances.
 - Shared cache: holds read results for all instances.
@@ -78,7 +85,8 @@ sequenceDiagram
 1. The API receives a create request with `source` and `externalId`.
 2. One database transaction persists the event with its `(source, external_id)` pair and its two competitor links.
 3. A repeated create with the same pair returns the stored event.
-4. The API returns success after the commit.
+4. Before the commit, the database rejects an exact duplicate: same sport, competitors and start instant from another source. The API answers with a conflict naming the existing event. This is an interim guard, see [ADR-0008](adr/0008-ingestion-boundary.md).
+5. The API returns success after the commit.
 
 ### Status update
 
@@ -203,13 +211,13 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 | 2  | Closed by [ADR-0002](adr/0002-event-lifecycle.md). ~~Domain model: exact status set, allowed transitions, terminal states.~~ | Conditional status updates need a defined set of allowed states. |
 | 3  | Closed by [ADR-0003](adr/0003-sports-and-competitors.md) and [ADR-0004](adr/0004-sport-specific-phase.md). ~~Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity?~~ | It shapes the schema and the type model. |
 | 4  | Closed by [ADR-0005](adr/0005-time-in-utc.md) and [ADR-0006](adr/0006-identifiers.md). ~~Time model (UTC instant only vs. plus venue time zone) and ID strategy.~~ | Schedules and list windows depend on how time and identity are stored. |
-| 5  | Partly closed by [ADR-0007](adr/0007-source-identity.md). ~~Create: what `sourceId` is~~ Still open: what counts as a duplicate match beyond a repeated create. | A retry is covered by the request identity; other duplicates are not. |
+| 5  | Closed by [ADR-0007](adr/0007-source-identity.md) and [ADR-0008](adr/0008-ingestion-boundary.md). ~~Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.~~ | A retry is covered by the request identity; other duplicates are not. |
 | 6  | Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).        | Defines the conflict behavior and the set of write operations. |
 | 7  | List queries: which filters are supported, pagination style (v1 uses a page number), which indexes back them. | Filters and paging decide cache keys and database load. |
 | 8  | Cache: final TTL, invalidation after writes, what "fresh" means during a database outage.                 | These rules set how stale a reader can see data. |
 | 9  | API style and error format.                                                                               | Consumers depend on a stable contract. |
 | 10 | Tooling: database, query layer, HTTP framework, test tools.                                               | Each tool choice must be justified. |
 | 11 | How consumers learn about changes (polling only vs. published change events).                             | It changes the load estimate and the write path. |
-| 12 | Implementation boundary: which parts are code, which are extension points, which are described only.      | It sets the scope of the work. |
+| 12 | Partly answered by [ADR-0008](adr/0008-ingestion-boundary.md) for adapters and reconciliation. Implementation boundary: which parts are code, which are extension points, which are described only.      | It sets the scope of the work. |
 
 Each question is closed by its own commit that adds a decision record under `docs/adr/` and updates this document.

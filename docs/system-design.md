@@ -71,15 +71,15 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant C as Consumer
+    participant S as Source
     participant A as API
     participant D as Database
-    C->>A: create match (source, externalId)
+    S->>A: create match (source, externalId)
     A->>D: begin transaction
     A->>D: insert event with (source, external_id)
     A->>D: insert event competitors
     A->>D: commit
-    A-->>C: success with match ID
+    A-->>S: success with match ID
 ```
 
 1. The API receives a create request with `source` and `externalId`.

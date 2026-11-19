@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -83,7 +83,7 @@ sequenceDiagram
 ### Status update
 
 1. The API receives a status update with `expectedVersion`.
-2. The write is conditional on the current allowed state and on `expectedVersion`.
+2. The write is conditional on a transition allowed by the [event lifecycle](#event-lifecycle) and on `expectedVersion`.
 3. On success, the version advances.
 
 ### Failure modes
@@ -127,12 +127,33 @@ Peak case:
 
 Match and Team are identified so far. Fields are not decided.
 
+## Event lifecycle
+
+The statuses and transitions are defined in [ADR-0002](adr/0002-event-lifecycle.md).
+
+```mermaid
+stateDiagram-v2
+    [*] --> scheduled
+    scheduled --> live
+    scheduled --> postponed
+    scheduled --> cancelled
+    postponed --> scheduled
+    postponed --> cancelled
+    live --> finished
+    finished --> [*]
+    cancelled --> [*]
+```
+
+- Reschedule is a command, not a status. The event stays `scheduled` and its start time changes.
+- Transitions come only from producer commands. The service does not change status by its own clock.
+- Every change advances the version.
+
 ## Open questions
 
 | #  | Question                                                                                                  | Why it matters |
 | -- | --------------------------------------------------------------------------------------------------------- | -------------- |
 | 1  | Closed by [ADR-0001](adr/0001-load-assumptions.md). ~~Load assumptions: are viewer count, polling interval and read/write ratio the right basis?~~ | The load estimate drives cache, pool and capacity choices. |
-| 2  | Domain model: exact status set, allowed transitions, terminal states.                                     | Conditional status updates need a defined set of allowed states. |
+| 2  | Closed by [ADR-0002](adr/0002-event-lifecycle.md). ~~Domain model: exact status set, allowed transitions, terminal states.~~ | Conditional status updates need a defined set of allowed states. |
 | 3  | Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity? | It shapes the schema and the type model. |
 | 4  | Time model (UTC instant only vs. plus venue time zone) and ID strategy.                                   | Schedules and list windows depend on how time and identity are stored. |
 | 5  | Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.               | A retry is covered by the request identity; other duplicates are not. |

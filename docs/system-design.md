@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md). Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -70,13 +70,14 @@ sequenceDiagram
     C->>A: create match (sourceId, requestId)
     A->>D: begin transaction
     A->>D: insert match
+    A->>D: insert event competitors
     A->>D: insert mapping (sourceId, requestId) to matchId
     A->>D: commit
     A-->>C: success with match ID
 ```
 
 1. The API receives a create request with `sourceId` and `requestId`.
-2. One database transaction persists the match and the mapping `(sourceId, requestId) -> matchId`.
+2. One database transaction persists the event, its two competitor links and the mapping `(sourceId, requestId) -> matchId`.
 3. A retry with the same identity returns the stored match ID.
 4. The API returns success after the commit.
 
@@ -123,9 +124,27 @@ Peak case:
 - At 100 ms per read, about 120 reads are in flight.
 - This exceeds a small connection pool. Open question 8 must address it.
 
-## Entities (sketch)
+## Entities
 
-Match and Team are identified so far. Fields are not decided.
+The model is defined in [ADR-0003](adr/0003-sports-and-competitors.md).
+
+| Table | Holds | One row is |
+| ----- | ----- | ---------- |
+| `sports` | the list of sports | Football |
+| `competitors` | teams and individual athletes | Salzburg |
+| `events` | when an event takes place and its status | the match on 2025-07-18 18:30 |
+| `event_competitors` | who takes part in which event, and in which role | Salzburg takes part in that match as home |
+
+```mermaid
+erDiagram
+    sports ||--o{ competitors : has
+    sports ||--o{ events : has
+    events ||--|{ event_competitors : has
+    competitors ||--o{ event_competitors : "takes part"
+```
+
+- A competitor is a team or an individual athlete.
+- The implemented scope is two-sided matches with one home and one away competitor.
 
 ## Event lifecycle
 
@@ -154,7 +173,7 @@ stateDiagram-v2
 | -- | --------------------------------------------------------------------------------------------------------- | -------------- |
 | 1  | Closed by [ADR-0001](adr/0001-load-assumptions.md). ~~Load assumptions: are viewer count, polling interval and read/write ratio the right basis?~~ | The load estimate drives cache, pool and capacity choices. |
 | 2  | Closed by [ADR-0002](adr/0002-event-lifecycle.md). ~~Domain model: exact status set, allowed transitions, terminal states.~~ | Conditional status updates need a defined set of allowed states. |
-| 3  | Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity? | It shapes the schema and the type model. |
+| 3  | Partly closed by [ADR-0003](adr/0003-sports-and-competitors.md). ~~Is Team a separate entity with its own identity? How are sports represented?~~ Still open: how sport-specific data are represented. | It shapes the schema and the type model. |
 | 4  | Time model (UTC instant only vs. plus venue time zone) and ID strategy.                                   | Schedules and list windows depend on how time and identity are stored. |
 | 5  | Create: what `sourceId` is, and what counts as a duplicate match beyond a retried request.               | A retry is covered by the request identity; other duplicates are not. |
 | 6  | Update: response on a stale `expectedVersion`; updates other than status (for example reschedule).        | Defines the conflict behavior and the set of write operations. |

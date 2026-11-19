@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 - initial sketch. Incomplete by intent; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md). Incomplete by intent; see Open questions.
 
 ## Scope of this version
 
@@ -93,14 +93,35 @@ sequenceDiagram
 3. Database outage: the service serves only fresh cached reads.
 4. Database outage: the service refuses writes.
 
-## Load estimate (working assumptions)
+## Load and volume assumptions
 
-These numbers are assumptions. The brief does not give them.
+The numbers and their basis are in [ADR-0001](adr/0001-load-assumptions.md).
+
+| Parameter | Value |
+| --------- | ----- |
+| New events per year | 400,000 to 1,000,000; sized for 1,000,000 |
+| New events per day | about 2,700 on average, up to 10,000 on a peak day |
+| Rows after 5 years | about 5 million |
+| Writes per event over its life | 5 to 10 (create, reschedule, start, finish, corrections) |
+| Write rate, average | below 1 per second |
+| Write rate, peak | 50 to 100 per second |
+| Read rate, average | 2,400 requests per second |
+| Read rate, peak | 10,000 to 12,000 requests per second |
+| Acceptable staleness, lists | up to 60 seconds |
+| Acceptable staleness, single event | up to 5 seconds |
+
+Average case:
 
 - 24,000 viewers poll every 10 seconds. That is 2,400 requests per second on average.
 - A 90% cache hit rate leaves 240 database reads per second.
 - At 100 ms per read, about 24 reads are in flight on average, if the database keeps up.
 - Connection-pool wait time and actual completions are separate measurements.
+
+Peak case:
+
+- 12,000 requests per second with a 90% cache hit rate leaves 1,200 database reads per second.
+- At 100 ms per read, about 120 reads are in flight.
+- This exceeds a small connection pool. Open question 8 must address it.
 
 ## Entities (sketch)
 
@@ -110,7 +131,7 @@ Match and Team are identified so far. Fields are not decided.
 
 | #  | Question                                                                                                  | Why it matters |
 | -- | --------------------------------------------------------------------------------------------------------- | -------------- |
-| 1  | Load assumptions: are viewer count, polling interval and read/write ratio the right basis?                | The load estimate drives cache, pool and capacity choices. |
+| 1  | Closed by [ADR-0001](adr/0001-load-assumptions.md). ~~Load assumptions: are viewer count, polling interval and read/write ratio the right basis?~~ | The load estimate drives cache, pool and capacity choices. |
 | 2  | Domain model: exact status set, allowed transitions, terminal states.                                     | Conditional status updates need a defined set of allowed states. |
 | 3  | Domain model: how sports and sport-specific data are represented; is Team a separate entity with its own identity? | It shapes the schema and the type model. |
 | 4  | Time model (UTC instant only vs. plus venue time zone) and ID strategy.                                   | Schedules and list windows depend on how time and identity are stored. |

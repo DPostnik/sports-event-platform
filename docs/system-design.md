@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md). One question is still open; see Open questions.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md). One question is still open; see Open questions.
 
 ## Scope of this version
 
@@ -38,7 +38,7 @@ flowchart LR
 - Load balancer: spreads requests across the API instances.
 - API service: one service, run as several identical instances.
 - Shared cache: holds read results for all instances. Redis, behind a cache port ([ADR-0015](adr/0015-shared-cache.md)).
-- Relational database: the source of truth for matches.
+- Relational database: the source of truth for matches. PostgreSQL ([ADR-0022](adr/0022-postgresql.md)).
 
 ## Request flows
 
@@ -269,7 +269,7 @@ Not built, in short: provider adapters, reconciliation, change events, match act
 | 7  | Closed by [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md) and [ADR-0013](adr/0013-indexes.md). ~~List queries: which filters are supported, pagination style (v1 uses a page number), which indexes back them.~~ | Filters and paging decide cache keys and database load. |
 | 8  | Closed by [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md) and [ADR-0016](adr/0016-failure-modes.md). ~~Cache: final TTL, invalidation after writes, what "fresh" means during a database outage.~~ | These rules set how stale a reader can see data. |
 | 9  | Closed by [ADR-0017](adr/0017-rest-api.md) and [ADR-0018](adr/0018-error-format.md). ~~API style and error format.~~ | Consumers depend on a stable contract. |
-| 10 | Tooling: database, query layer, HTTP framework, test tools.                                               | Each tool choice must be justified. |
+| 10 | Partly closed by [ADR-0022](adr/0022-postgresql.md). ~~Tooling: database~~ Still open: query layer, HTTP framework, test tools. | Each tool choice must be justified. |
 | 11 | Closed by [ADR-0020](adr/0020-change-propagation.md). ~~How consumers learn about changes (polling only vs. published change events).~~ | It changes the load estimate and the write path. |
 | 12 | Closed by [ADR-0021](adr/0021-implementation-boundary.md). ~~Implementation boundary: which parts are code, which are extension points, which are described only.~~ | It sets the scope of the work. |
 

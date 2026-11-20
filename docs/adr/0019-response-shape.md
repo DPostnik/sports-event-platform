@@ -1,6 +1,6 @@
 # ADR-0019: Response shape and freshness through standard HTTP headers
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0027](0027-names-in-event-responses.md)
 
 Date: 2026-11-19
 

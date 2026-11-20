@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -142,7 +142,7 @@ The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)).
 
 Every error uses one format, RFC 9457 Problem Details, with a stable `code` ([ADR-0018](adr/0018-error-format.md)).
 
-A success response has `generatedAt` at the top and the payload under `event` or `events`. Freshness is stated with `Cache-Control`, `ETag` and `Age`. There is no envelope and no stale flag ([ADR-0019](adr/0019-response-shape.md)).
+A success response has `generatedAt` at the top and the payload under `event` or `events`. Freshness is stated with `Cache-Control`, `ETag` and `Age`. There is no envelope and no stale flag ([ADR-0019](adr/0019-response-shape.md)). An event carries the names of its sport and competitors ([ADR-0027](adr/0027-names-in-event-responses.md)).
 
 ## Load and volume assumptions
 
@@ -194,6 +194,7 @@ erDiagram
 ```
 
 - A competitor is a team or an individual athlete.
+- Sports and competitors are reference data loaded by seed data. The API does not create or change them. Event responses embed their names ([ADR-0027](adr/0027-names-in-event-responses.md)).
 - The implemented scope is two-sided matches with one home and one away competitor.
 
 ## Event lifecycle
@@ -283,5 +284,6 @@ Not built, in short: provider adapters, reconciliation, change events, match act
 | 10 | Closed by [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md) and [ADR-0026](adr/0026-test-tools.md). ~~Tooling: database, query layer, HTTP framework, test tools.~~ | Each tool choice must be justified. |
 | 11 | Closed by [ADR-0020](adr/0020-change-propagation.md). ~~How consumers learn about changes (polling only vs. published change events).~~ | It changes the load estimate and the write path. |
 | 12 | Closed by [ADR-0021](adr/0021-implementation-boundary.md). ~~Implementation boundary: which parts are code, which are extension points, which are described only.~~ | It sets the scope of the work. |
+| 13 | Closed by [ADR-0027](adr/0027-names-in-event-responses.md). ~~How a consumer gets the names of the sport and the competitors, and how that reference data is created.~~ | A consumer cannot show "Salzburg vs. Sturm" from IDs alone. |
 
 Each question was closed by its own commit that added a decision record under `docs/adr/` and updated this document. New questions found during implementation are added here and closed the same way.

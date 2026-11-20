@@ -1,6 +1,6 @@
 # ADR-0011: Two read operations - one event, and one filtered list
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0027](0027-names-in-event-responses.md)
 
 Date: 2026-11-19
 

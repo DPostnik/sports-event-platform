@@ -1,6 +1,6 @@
 # ADR-0003: Sports, competitors and event participation
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0027](0027-names-in-event-responses.md)
 
 Date: 2026-11-19
 

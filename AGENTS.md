@@ -70,6 +70,8 @@ Project files are imported by the full path from the project root: `#src/...` an
 | ------- | ------- |
 | `npm run typecheck` | Compile without emitting |
 | `npm run lint` | Lint, including the import rules |
+| `npm run format` | Format files with Prettier |
+| `npm run format:check` | Check formatting without writing |
 | `npm run test:domain` | Domain tests, no Docker |
 | `npm run test:persistence` | Persistence tests, needs Docker |
 | `npm run test:api` | API tests, needs Docker |

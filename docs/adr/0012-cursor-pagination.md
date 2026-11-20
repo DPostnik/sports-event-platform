@@ -1,6 +1,6 @@
 # ADR-0012: Cursor pagination on start time and event ID
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md)
 
 Date: 2026-11-19
 

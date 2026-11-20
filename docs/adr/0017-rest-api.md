@@ -1,6 +1,6 @@
 # ADR-0017: REST over HTTP with command endpoints
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md)
 
 Date: 2026-11-19
 

@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -66,13 +66,13 @@ There are two read operations ([ADR-0011](adr/0011-read-queries.md)): one event 
 
 - List filters, all optional: time window, sport, status, competitor.
 - List order is fixed: start time, then event ID.
-- Paging uses a cursor on that order: 50 events by default, 100 at most ([ADR-0012](adr/0012-cursor-pagination.md)).
+- Paging uses a cursor on that order: 50 events by default, 100 at most ([ADR-0012](adr/0012-cursor-pagination.md)). The consumer chooses the size with `limit`, from 1 to 100 ([ADR-0029](adr/0029-list-page-size-parameter.md)).
 - Each query has one index, and every list index ends with the list order ([ADR-0013](adr/0013-indexes.md)).
 
 1. The API receives a read or list request.
 2. The API checks the shared cache first.
 3. On a miss, the API reads from the database and populates the cache.
-4. The list cache key contains the filters and the cursor.
+4. The list cache key contains the filters, the cursor and the limit.
 5. A list page expires after 60 seconds. One event is deleted from the cache when it changes, with a 60-second expiry as a safety net ([ADR-0014](adr/0014-cache-freshness.md)).
 
 ### Create
@@ -137,7 +137,7 @@ The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)).
 | ------ | ------- |
 | Create an event | `POST /events` |
 | Get one event | `GET /events/{id}` |
-| List events | `GET /events` with filters and cursor |
+| List events | `GET /events` with filters, cursor and limit |
 | Six write commands | `POST /events/{id}/start`, `/finish`, `/postpone`, `/reschedule`, `/cancel`, `/phase` |
 
 Every error uses one format, RFC 9457 Problem Details, with a stable `code` ([ADR-0018](adr/0018-error-format.md)).
@@ -287,5 +287,6 @@ Not built, in short: provider adapters, reconciliation, change events, match act
 | 12 | Closed by [ADR-0021](adr/0021-implementation-boundary.md). ~~Implementation boundary: which parts are code, which are extension points, which are described only.~~ | It sets the scope of the work. |
 | 13 | Closed by [ADR-0027](adr/0027-names-in-event-responses.md). ~~How a consumer gets the names of the sport and the competitors, and how that reference data is created.~~ | A consumer cannot show "Salzburg vs. Sturm" from IDs alone. |
 | 14 | Closed by [ADR-0028](adr/0028-source-ownership-needs-authentication.md). ~~Who may change an event: how the rule "a source changes only its own events" is enforced.~~ | Without authentication the rule of ADR-0007 is a convention, not a guarantee. |
+| 15 | Closed by [ADR-0029](adr/0029-list-page-size-parameter.md). ~~How a consumer chooses the page size of the list, and what happens to the cache key.~~ | The maximum of ADR-0012 is unusable without a parameter, and the cache key must tell page sizes apart. |
 
 Each question was closed by its own commit that added a decision record under `docs/adr/` and updated this document. New questions found during implementation are added here and closed the same way.

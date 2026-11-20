@@ -1,6 +1,6 @@
 # ADR-0014: Cache freshness - delete on write for one event, expiry for lists
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md)
 
 Date: 2026-11-19
 

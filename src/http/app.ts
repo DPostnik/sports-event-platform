@@ -45,6 +45,21 @@ interface AppOptions {
 }
 
 const healthResponse = z.strictObject({ status: z.literal("ok") });
+function matchesIfNoneMatch(header: string | undefined, opaqueTag: string): boolean {
+  if (!header) return false;
+  if (header.trim() === "*") return true;
+
+  // A quoted tag may contain a comma. Compare its opaque value for a weak match.
+  const tags = /[ \t]*(?:W\/)?("[^"]*")[ \t]*(?:,|$)/gy;
+  let matched = false;
+  while (tags.lastIndex < header.length) {
+    const tag = tags.exec(header);
+    if (!tag) return false;
+    if (tag[1] === opaqueTag) matched = true;
+  }
+  return matched;
+}
+
 const emptyQuery = z.strictObject({});
 
 export async function buildApp(options: AppOptions) {
@@ -105,11 +120,17 @@ export async function buildApp(options: AppOptions) {
       summary: "Get an event",
       params: eventParams,
       querystring: emptyQuery,
-      response: { 200: eventResponse, ...singleEventErrors },
+      headers: z.looseObject({ "if-none-match": z.string().optional() }),
+      response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
     },
   }, async (request, reply) => {
     const result = await events.get(request.params.id);
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
+    const opaqueTag = `"${String(result.value.event.version)}"`;
+    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", "0");
+    if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
+      return reply.code(304).send(null);
+    }
     return singleEvent(result.value);
   });
 

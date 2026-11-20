@@ -3,7 +3,7 @@ import { expect } from "vitest";
 import { z } from "zod";
 
 const responseSchema = z.object({
-  content: z.record(z.string(), z.object({ schema: z.record(z.string(), z.unknown()) })),
+  content: z.record(z.string(), z.object({ schema: z.record(z.string(), z.unknown()) })).optional(),
 });
 const operationSchema = z.object({
   responses: z.record(z.string(), responseSchema),
@@ -25,7 +25,7 @@ export async function expectDocumentedResponse(
 ): Promise<void> {
   const contentType = String(response.headers["content-type"]).split(";")[0]?.trim() ?? "";
   const schema = document.paths[path]?.[method.toLowerCase()]?.responses[response.statusCode]
-    ?.content[contentType]?.schema;
+    ?.content?.[contentType]?.schema;
   if (schema === undefined) {
     throw new Error(`OpenAPI is missing ${method} ${path} ${String(response.statusCode)} ${contentType}`);
   }

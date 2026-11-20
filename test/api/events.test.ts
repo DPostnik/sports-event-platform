@@ -105,6 +105,24 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     ]);
   });
 
+  test("revalidates a single event against its current version (ADR-0039)", async () => {
+    const event = await create("revalidation");
+    const url = `/events/${event.id}`;
+    const first = await runningApp().inject(url);
+    expect(first.headers).toMatchObject({ etag: 'W/"1"', "cache-control": "no-cache", age: "0" });
+    const headers = { "if-none-match": 'W/"another,tag", "1"' };
+    const unchanged = await runningApp().inject({ url, headers });
+    expect(unchanged.statusCode).toBe(304);
+    expect(unchanged.body).toBe("");
+    expect(unchanged.headers.etag).toBe(first.headers.etag);
+    expect(openApi.paths["/events/{id}"]?.get?.responses["304"]).toBeDefined();
+
+    await command(event.id, "start", 200, { expectedVersion: 1 });
+    const changed = await runningApp().inject({ url, headers });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.headers.etag).toBe('W/"2"');
+  });
+
   test("repeats return the stored event when the new payload differs (ADR-0038)", async () => {
     const event = await create("repeat");
     const repeated = await request("POST", "/events", "/events", 200, {

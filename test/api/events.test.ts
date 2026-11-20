@@ -1,3 +1,4 @@
+import { readConfiguration } from "#src/config/environment.ts";
 import { sql } from "kysely";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { z } from "zod";
@@ -45,7 +46,7 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
   beforeAll(async () => {
     database = await startTestDatabase();
     await seed(database.db);
-    app = await buildService({ databaseUrl: database.connectionString, host: "127.0.0.1", port: 3000 }, false);
+    app = await buildService(readConfiguration({ DATABASE_URL: database.connectionString }), false);
     const response = await app.inject("/openapi.json");
     expect(response.statusCode).toBe(200);
     openApi = openApiSchema.parse(JSON.parse(response.body));
@@ -248,7 +249,7 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     }
     const connection = new URL(database.connectionString);
     connection.password = "wrong-password";
-    const unavailable = await buildService({ databaseUrl: connection.href, host: "127.0.0.1", port: 3000 }, false);
+    const unavailable = await buildService(readConfiguration({ DATABASE_URL: connection.href }), false);
     try {
       const health = await unavailable.inject("/health");
       expect(health.statusCode).toBe(200);

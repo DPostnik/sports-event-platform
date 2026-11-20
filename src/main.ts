@@ -25,7 +25,11 @@ function isDatabaseUnavailable(error: unknown): boolean {
 }
 
 export async function buildService(config: Configuration, logger = true) {
-  const db = createDatabase(config.databaseUrl);
+  const db = createDatabase(config.databaseUrl, {
+    max: config.poolSize,
+    connectionTimeoutMillis: config.poolWaitMs,
+    statement_timeout: config.statementTimeoutMs,
+  });
   const repository = createEventRepository(db);
   const events = new EventUseCases(repository, {
     next() {

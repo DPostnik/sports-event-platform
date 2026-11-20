@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/main.ts",
     "dev": "node --watch src/main.ts",
+    "migrate": "node --env-file-if-exists=.env src/infrastructure/persistence/cli.ts migrate",
+    "seed": "node --env-file-if-exists=.env src/infrastructure/persistence/cli.ts seed",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:domain": "vitest run --project domain",

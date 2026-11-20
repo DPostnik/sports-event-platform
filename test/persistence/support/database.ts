@@ -1,6 +1,6 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Kysely, PostgresDialect, sql } from "kysely";
-import pg from "pg";
+import { sql, type Kysely } from "kysely";
+import { createDatabase } from "../../../src/infrastructure/persistence/connection.ts";
 import type { Database } from "../../../src/infrastructure/persistence/database.ts";
 import { migrateToLatest } from "../../../src/infrastructure/persistence/migrate.ts";
 
@@ -13,8 +13,7 @@ export interface TestDatabase {
 // migrations applied to the empty database.
 export async function startTestDatabase(): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer("postgres:17").start();
-  const pool = new pg.Pool({ connectionString: container.getConnectionUri() });
-  const db = new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
+  const db = createDatabase(container.getConnectionUri());
   await migrateToLatest(db);
 
   return {

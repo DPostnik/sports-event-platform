@@ -232,7 +232,7 @@ export async function buildApp(options: AppOptions) {
         params: eventParams,
         querystring: emptyQuery,
         headers: conditionalHeaders,
-        response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
+        response: { 200: eventResponse, 304: z.undefined().describe("Event version unchanged"), ...singleEventErrors },
       },
     },
     async (request, reply) => {
@@ -258,7 +258,7 @@ export async function buildApp(options: AppOptions) {
       const opaqueTag = `"${String(entry.body.event.version)}"`;
       reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
       if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
-        return reply.code(304).send(null);
+        return reply.code(304).send();
       }
       return entry.body;
     },
@@ -271,7 +271,7 @@ export async function buildApp(options: AppOptions) {
         summary: "List events by start time and ID",
         querystring: listQuery,
         headers: conditionalHeaders,
-        response: { 200: listResponse, 304: z.null().describe("List page unchanged"), ...eventErrors },
+        response: { 200: listResponse, 304: z.undefined().describe("List page unchanged"), ...eventErrors },
       },
     },
     async (request, reply) => {
@@ -303,7 +303,7 @@ export async function buildApp(options: AppOptions) {
       const opaqueTag = `"${hash}"`;
       reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "max-age=60").header("Age", String(entry.age));
       if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
-        return reply.code(304).send(null);
+        return reply.code(304).send();
       }
       return entry.body;
     },

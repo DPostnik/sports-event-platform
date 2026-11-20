@@ -199,6 +199,8 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     const unchanged = await runningApp().inject({ url, headers });
     expect(unchanged.statusCode).toBe(304);
     expect(unchanged.body).toBe("");
+    expect(unchanged.headers["content-type"]).toBeUndefined();
+    expect(unchanged.headers["content-length"]).toBeUndefined();
     expect(unchanged.headers.etag).toBe(first.headers.etag);
     expect(openApi.paths["/events/{id}"]?.get?.responses["304"]).toBeDefined();
 
@@ -223,6 +225,8 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     const unchanged = await runningApp().inject({ url, headers });
     expect(unchanged.statusCode).toBe(304);
     expect(unchanged.body).toBe("");
+    expect(unchanged.headers["content-type"]).toBeUndefined();
+    expect(unchanged.headers["content-length"]).toBeUndefined();
     expect(unchanged.headers).toMatchObject({ etag: tag, "cache-control": "max-age=60", age: "0" });
 
     // Only nextCursor changes on the first page when a second page appears.

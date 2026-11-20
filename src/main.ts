@@ -1,3 +1,5 @@
+import { createClient } from "@redis/client";
+import { createRedisCache } from "#src/infrastructure/cache/redis-cache.ts";
 import { sql } from "kysely";
 import { v7 } from "uuid";
 import { EventUseCases } from "#src/application/event-use-cases.ts";
@@ -25,9 +27,15 @@ export async function buildService(config: Configuration, logger = true) {
     },
   });
 
+  const redis = config.redisUrl === undefined ? undefined : createClient({
+    url: config.redisUrl,
+    disableOfflineQueue: true,
+    commandOptions: { timeout: 200 },
+  });
   try {
     const app = await buildApp({
       events,
+      cache: redis && createRedisCache(redis),
       clock: { now: () => new Date() },
       checkReadiness: async () => {
         await sql`SELECT 1`.execute(db);
@@ -36,7 +44,18 @@ export async function buildService(config: Configuration, logger = true) {
       retryAfterSeconds: config.retryAfterSeconds,
       logger,
     });
-    app.addHook("onClose", () => db.destroy());
+    if (redis) {
+      redis.on("error", (err: Error) => {
+        app.log.warn({ err }, "Redis connection failed");
+      });
+      void redis.connect().catch((err: unknown) => {
+        app.log.warn({ err }, "Redis connection stopped");
+      });
+    }
+    app.addHook("onClose", async () => {
+      if (redis?.isOpen) redis.destroy();
+      await db.destroy();
+    });
     return app;
   } catch (error) {
     await db.destroy();

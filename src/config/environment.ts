@@ -5,6 +5,7 @@ const positiveInteger = z.string().regex(/^[0-9]+$/).transform(Number)
 
 const environmentSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/, hostname: /.+/ }),
+  REDIS_URL: z.url({ protocol: /^rediss?$/, hostname: /.+/ }).optional(),
   DB_POOL_SIZE: positiveInteger.default(10),
   DB_POOL_WAIT_MS: positiveInteger.default(200),
   DB_STATEMENT_TIMEOUT_MS: positiveInteger.default(1000),
@@ -16,6 +17,7 @@ const environmentSchema = z.object({
 
 export interface Configuration {
   readonly databaseUrl: string;
+  readonly redisUrl: string | undefined;
   readonly poolSize: number;
   readonly poolWaitMs: number;
   readonly statementTimeoutMs: number;
@@ -38,6 +40,7 @@ export function readConfiguration(environment: NodeJS.ProcessEnv): Configuration
       OVERLOADED: parsed.data.OVERLOADED_RETRY_AFTER_SECONDS,
       UNAVAILABLE: parsed.data.UNAVAILABLE_RETRY_AFTER_SECONDS,
     },
+    redisUrl: parsed.data.REDIS_URL,
     poolSize: parsed.data.DB_POOL_SIZE,
     poolWaitMs: parsed.data.DB_POOL_WAIT_MS,
     statementTimeoutMs: parsed.data.DB_STATEMENT_TIMEOUT_MS,

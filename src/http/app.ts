@@ -2,6 +2,7 @@ import swagger from "@fastify/swagger";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import type { Cache } from "#src/application/cache.ts";
 import type { Clock } from "#src/application/clock.ts";
 import type { EventUseCases } from "#src/application/event-use-cases.ts";
 import type { EventView } from "#src/application/event-view.ts";
@@ -38,6 +39,7 @@ import {
 interface AppOptions {
   readonly events: Pick<EventUseCases, "create" | "get" | "list" | "command">;
   readonly clock: Clock;
+  readonly cache: Cache | undefined;
   readonly checkReadiness: () => Promise<void>;
   readonly databaseFailure: (error: unknown) => "OVERLOADED" | "UNAVAILABLE" | undefined;
   readonly retryAfterSeconds: Readonly<Record<"OVERLOADED" | "UNAVAILABLE", number>>;
@@ -63,7 +65,7 @@ function matchesIfNoneMatch(header: string | undefined, opaqueTag: string): bool
 const emptyQuery = z.strictObject({});
 
 export async function buildApp(options: AppOptions) {
-  const { events, clock, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
+  const { events, clock, cache, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
   function sendDatabaseProblem(reply: FastifyReply, code: "OVERLOADED" | "UNAVAILABLE") {
     return sendProblem(reply.header("Retry-After", retryAfterSeconds[code]), databaseProblem(code));
   }
@@ -101,6 +103,14 @@ export async function buildApp(options: AppOptions) {
     return { generatedAt: clock.now().toISOString(), event: toEventResponse(view) };
   }
 
+  async function readCachedEvent(key: string, id: EventId) {
+    const raw = await cache?.get(key);
+    if (raw === undefined) return undefined;
+    const body = eventResponse.parse(JSON.parse(raw));
+    const age = Math.floor((clock.now().getTime() - Date.parse(body.generatedAt)) / 1000);
+    return body.event.id === id && age >= 0 && age < 60 ? { body, age } : undefined;
+  }
+
   app.post("/events", {
     schema: {
       summary: "Create an event or return the stored event for the source identity",
@@ -124,14 +134,27 @@ export async function buildApp(options: AppOptions) {
       response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
     },
   }, async (request, reply) => {
-    const result = await events.get(request.params.id);
-    if (!result.ok) return sendProblem(reply, eventProblem(result.error));
-    const opaqueTag = `"${String(result.value.event.version)}"`;
-    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", "0");
+    const id = request.params.id;
+    const key = `event:${id}`;
+    let entry = await readCachedEvent(key, id).catch((err: unknown) => {
+      request.log.warn({ err }, "Failed to read cached event");
+      return undefined;
+    });
+    if (!entry) {
+      const result = await events.get(id);
+      if (!result.ok) return sendProblem(reply, eventProblem(result.error));
+      const body = singleEvent(result.value);
+      await cache?.set(key, JSON.stringify(body), 3600).catch((err: unknown) => {
+        request.log.warn({ err }, "Failed to cache event");
+      });
+      entry = { body, age: 0 };
+    }
+    const opaqueTag = `"${String(entry.body.event.version)}"`;
+    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
     if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
       return reply.code(304).send(null);
     }
-    return singleEvent(result.value);
+    return entry.body;
   });
 
   app.get("/events", {
@@ -159,6 +182,9 @@ export async function buildApp(options: AppOptions) {
   async function runCommand(id: EventId, command: Command, reply: FastifyReply) {
     const result = await events.command(id, command);
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
+    await cache?.delete(`event:${id}`).catch((err: unknown) => {
+      reply.log.warn({ err }, "Failed to invalidate cached event");
+    });
     return reply.code(200).send(singleEvent(result.value));
   }
 

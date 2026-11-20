@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -197,6 +197,7 @@ erDiagram
 - A competitor is a team or an individual athlete.
 - Sports and competitors are reference data loaded by seed data. The API does not create or change them. Event responses embed their names ([ADR-0027](adr/0027-names-in-event-responses.md)).
 - The implemented scope is two-sided matches with one home and one away competitor.
+- The database enforces with composite foreign keys that each competitor of an event belongs to the sport of the event ([ADR-0035](adr/0035-same-sport-enforced-by-schema.md)).
 
 ## Event lifecycle
 
@@ -218,6 +219,7 @@ stateDiagram-v2
 - Reschedule is a command, not a status. The event stays `scheduled` and its start time changes.
 - Transitions come only from producer commands. The service does not change status by its own clock.
 - Every change advances the version.
+- The service stores the current state only. Actual start and end times, a cancellation reason and earlier start times are not stored ([ADR-0036](adr/0036-current-state-only.md)).
 
 ### Live phase
 

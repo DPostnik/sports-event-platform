@@ -25,7 +25,7 @@ Done when: `test:domain` passes without Docker and the domain imports nothing ou
 
 ## Step 3 - Persistence
 
-- Migrations: `sports`, `competitors`, `events`, `event_competitors`, constraints and the indexes of ADR-0013.
+- Migrations: `sports`, `competitors`, `events`, `event_competitors`, constraints, the composite foreign keys that enforce the same sport of event and competitor (ADR-0035) and the indexes of ADR-0013.
 - Kysely schema types and the row-to-domain mapper with domain checks (ADR-0034).
 - Repository: idempotent create (ADR-0007), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012).
 - Seed data: two sports, four competitors, the two example events of the brief.

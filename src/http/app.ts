@@ -5,7 +5,9 @@ import { jsonSchemaTransform, serializerCompiler, validatorCompiler, type ZodTyp
 import { z } from "zod";
 import type { Cache } from "#src/application/cache.ts";
 import type { Clock } from "#src/application/clock.ts";
-import type { EventUseCases } from "#src/application/event-use-cases.ts";
+import { InFlightReads } from "#src/application/in-flight-reads.ts";
+import { ok, type Result } from "#src/domain/result.ts";
+import type { EventNotFound, EventUseCases } from "#src/application/event-use-cases.ts";
 import type { EventView } from "#src/application/event-view.ts";
 import type { Command } from "#src/domain/commands.ts";
 import type { EventId } from "#src/domain/ids.ts";
@@ -69,6 +71,9 @@ const emptyQuery = z.strictObject({});
 
 export async function buildApp(options: AppOptions) {
   const { events, clock, cache, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
+  const eventReads = new InFlightReads<Result<z.output<typeof eventResponse>, EventNotFound>>();
+  const pageReads = new InFlightReads<z.output<typeof listResponse>>();
+
   function sendDatabaseProblem(reply: FastifyReply, code: "OVERLOADED" | "UNAVAILABLE") {
     return sendProblem(reply.header("Retry-After", retryAfterSeconds[code]), databaseProblem(code));
   }
@@ -136,6 +141,7 @@ export async function buildApp(options: AppOptions) {
     const result = await events.create(request.body);
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
     const { view, created } = result.value;
+    if (created) eventReads.invalidate(`event:${view.event.id}`);
     return reply.code(created ? 201 : 200).send(singleEvent(view));
   });
 
@@ -152,11 +158,15 @@ export async function buildApp(options: AppOptions) {
     const key = `event:${id}`;
     let entry = await readCached(key, eventResponse, request);
     if (entry?.body.event.id !== id) {
-      const result = await events.get(id);
-      if (!result.ok) return sendProblem(reply, eventProblem(result.error));
-      const body = singleEvent(result.value);
-      await cacheResponse(key, body, request);
-      entry = { body, age: 0 };
+      const loaded = await eventReads.run(key, async () => {
+        const result = await events.get(id);
+        if (!result.ok) return result;
+        const body = singleEvent(result.value);
+        await cacheResponse(key, body, request);
+        return ok(body);
+      });
+      if (!loaded.ok) return sendProblem(reply, eventProblem(loaded.error));
+      entry = { body: loaded.value, age: 0 };
     }
     const opaqueTag = `"${String(entry.body.event.version)}"`;
     reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
@@ -178,13 +188,16 @@ export async function buildApp(options: AppOptions) {
     const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
     let entry = await readCached(key, listResponse, request);
     if (!entry) {
-      const page = await events.list(toEventFilters(request.query), cursor, limit);
-      const body = {
-        generatedAt: clock.now().toISOString(),
-        events: page.views.map(toEventResponse),
-        nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
-      };
-      await cacheResponse(key, body, request);
+      const body = await pageReads.run(key, async () => {
+        const page = await events.list(toEventFilters(request.query), cursor, limit);
+        const response = {
+          generatedAt: clock.now().toISOString(),
+          events: page.views.map(toEventResponse),
+          nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
+        };
+        await cacheResponse(key, response, request);
+        return response;
+      });
       entry = { body, age: 0 };
     }
     const { events: items, nextCursor } = entry.body;
@@ -201,7 +214,9 @@ export async function buildApp(options: AppOptions) {
   async function runCommand(id: EventId, command: Command, reply: FastifyReply) {
     const result = await events.command(id, command);
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
-    await cache?.delete(`event:${id}`).catch((err: unknown) => {
+    const key = `event:${id}`;
+    eventReads.invalidate(key);
+    await cache?.delete(key).catch((err: unknown) => {
       reply.log.warn({ err }, "Failed to invalidate cached event");
     });
     return reply.code(200).send(singleEvent(result.value));

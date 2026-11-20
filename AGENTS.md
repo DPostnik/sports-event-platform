@@ -59,6 +59,7 @@ Import rules, enforced by the linter:
 
 - Every behaviour marked as built in ADR-0021 has tests at the level named in ADR-0026.
 - Name a test after the rule it checks, and reference the requirement ID or ADR in the `describe` title where one applies.
+- One test per rule. Do not add a second test that proves the same rule at the same level.
 - Do not weaken, skip or delete a failing test to make a step pass. Report the failure.
 
 ## Commands

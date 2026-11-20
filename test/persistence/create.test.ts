@@ -6,7 +6,13 @@ import type { Event } from "#src/domain/event.ts";
 import type { Database } from "#src/infrastructure/persistence/database.ts";
 import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
 import { competitorId, eventId } from "#test/domain/fixtures.ts";
-import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "#test/persistence/support/database.ts";
+import {
+  resetData,
+  SALZBURG,
+  startTestDatabase,
+  STURM,
+  type TestDatabase,
+} from "#test/persistence/support/database.ts";
 
 let testDatabase: TestDatabase | undefined;
 let db: Kysely<Database>;

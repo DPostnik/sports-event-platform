@@ -16,7 +16,9 @@ describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
       .withExposedPorts(6379)
       .withWaitStrategy(Wait.forLogMessage("Ready to accept connections"))
       .start();
-    onTestFinished(async () => { await redis.stop(); });
+    onTestFinished(async () => {
+      await redis.stop();
+    });
     const config = readConfiguration({
       DATABASE_URL: database.connectionString,
       WRITER_KEYS: writerKeyEnvironment,
@@ -30,11 +32,13 @@ describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
     const url = `/events/${id}`;
 
     // The API connects to Redis in the background.
-    await expect.poll(async () => {
-      await writer.inject(url);
-      const result = await redis.exec(["redis-cli", "EXISTS", `event:${id}`]);
-      return result.output.trim();
-    }).toBe("1");
+    await expect
+      .poll(async () => {
+        await writer.inject(url);
+        const result = await redis.exec(["redis-cli", "EXISTS", `event:${id}`]);
+        return result.output.trim();
+      })
+      .toBe("1");
 
     await database.db.transaction().execute(async (trx) => {
       await sql`LOCK TABLE events IN ACCESS EXCLUSIVE MODE`.execute(trx);
@@ -44,7 +48,10 @@ describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
     });
 
     const command = await writer.inject({
-      method: "POST", url: `${url}/start`, headers: manualWriter.headers, payload: { expectedVersion: 1 },
+      method: "POST",
+      url: `${url}/start`,
+      headers: manualWriter.headers,
+      payload: { expectedVersion: 1 },
     });
     expect(command.statusCode).toBe(200);
     const updated = await reader.inject({ url, headers: { "if-none-match": 'W/"1"' } });

@@ -72,10 +72,7 @@ export function buildListQuery(
     query = query.where(
       "e.id",
       "in",
-      db
-        .selectFrom("event_competitors")
-        .select("event_id")
-        .where("competitor_id", "=", filters.competitorId),
+      db.selectFrom("event_competitors").select("event_id").where("competitor_id", "=", filters.competitorId),
     );
   }
   if (cursor !== undefined) {
@@ -83,9 +80,7 @@ export function buildListQuery(
     // (start_time, id) > (cursor time, cursor ID). The first value decides,
     // the second breaks a tie. The index stores the same pair in the same
     // order, so the scan starts at the cursor and reads no earlier row.
-    query = query.where((eb) =>
-      eb(eb.refTuple("e.start_time", "e.id"), ">", eb.tuple(cursor.startsAt, cursor.id)),
-    );
+    query = query.where((eb) => eb(eb.refTuple("e.start_time", "e.id"), ">", eb.tuple(cursor.startsAt, cursor.id)));
   }
 
   // One row more than the page tells whether a next page exists.
@@ -138,8 +133,7 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
         }
 
         // Read the stored event: the new one, or the one that already existed.
-        const row = await selectBySourceIdentity(trx, event.source, event.externalId)
-          .executeTakeFirstOrThrow();
+        const row = await selectBySourceIdentity(trx, event.source, event.externalId).executeTakeFirstOrThrow();
         return { view: toEventView(row), created: inserted !== undefined };
       });
     },
@@ -188,11 +182,7 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
       if (ids.length === 0) {
         return [];
       }
-      const rows = await db
-        .selectFrom("competitors")
-        .select(["id", "sport_code"])
-        .where("id", "in", ids)
-        .execute();
+      const rows = await db.selectFrom("competitors").select(["id", "sport_code"]).where("id", "in", ids).execute();
       return rows.map((row) => {
         const id = parseCompetitorId(row.id);
         if (!id.ok) {

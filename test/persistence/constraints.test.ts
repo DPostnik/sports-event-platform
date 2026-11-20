@@ -1,7 +1,13 @@
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Database } from "#src/infrastructure/persistence/database.ts";
-import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "#test/persistence/support/database.ts";
+import {
+  resetData,
+  SALZBURG,
+  startTestDatabase,
+  STURM,
+  type TestDatabase,
+} from "#test/persistence/support/database.ts";
 
 // PER-2: the database rejects bad data by itself. Each test writes one bad
 // row with plain SQL and names the constraint that must refuse it.
@@ -46,12 +52,7 @@ function insertEvent(changes: Partial<typeof VALID_EVENT> = {}): Promise<unknown
   `.execute(db);
 }
 
-function insertLink(
-  competitorId: string,
-  role: string,
-  eventId = EVENT,
-  sportCode = "football",
-): Promise<unknown> {
+function insertLink(competitorId: string, role: string, eventId = EVENT, sportCode = "football"): Promise<unknown> {
   return sql`
     INSERT INTO event_competitors (event_id, competitor_id, sport_code, role)
     VALUES (${eventId}, ${competitorId}, ${sportCode}, ${role})
@@ -84,10 +85,7 @@ describe("Constraints of sports and competitors (ADR-0003, PER-2)", () => {
   });
 
   it("refuses a sport without a name", async () => {
-    await expectRefusedBy(
-      sql`INSERT INTO sports (code, name) VALUES ('tennis', '')`.execute(db),
-      "sports_name_check",
-    );
+    await expectRefusedBy(sql`INSERT INTO sports (code, name) VALUES ('tennis', '')`.execute(db), "sports_name_check");
   });
 
   it("refuses a competitor of an unknown sport", async () => {
@@ -127,10 +125,7 @@ describe("Constraints of events (ADR-0002, ADR-0004, ADR-0007, ADR-0009, PER-2)"
   });
 
   it("refuses a phase on an event that is not live", async () => {
-    await expectRefusedBy(
-      insertEvent({ status: "finished", phase: "2nd_half" }),
-      "events_phase_only_when_live_check",
-    );
+    await expectRefusedBy(insertEvent({ status: "finished", phase: "2nd_half" }), "events_phase_only_when_live_check");
   });
 
   it("refuses a second event with the same source and external ID", async () => {
@@ -177,9 +172,6 @@ describe("Constraints of event competitors (ADR-0003, ADR-0035, PER-2)", () => {
       insertLink(KAC, "away", EVENT, "football"),
       "event_competitors_competitor_id_sport_code_fkey",
     );
-    await expectRefusedBy(
-      insertLink(KAC, "away", EVENT, "ice_hockey"),
-      "event_competitors_event_id_sport_code_fkey",
-    );
+    await expectRefusedBy(insertLink(KAC, "away", EVENT, "ice_hockey"), "event_competitors_event_id_sport_code_fkey");
   });
 });

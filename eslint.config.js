@@ -31,9 +31,7 @@ const layerRule = (layer, forbidden) => ({
           })),
           { regex: "^#src/main\\.ts$", message: `${layer} must not import the composition root.` },
           // The domain imports only its own files: no packages and no Node built-ins.
-          ...(layer === "domain"
-            ? [{ regex: "^(?!#src/domain/)", message: "domain imports only domain files." }]
-            : []),
+          ...(layer === "domain" ? [{ regex: "^(?!#src/domain/)", message: "domain imports only domain files." }] : []),
         ],
       },
     ],

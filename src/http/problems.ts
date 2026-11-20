@@ -25,7 +25,12 @@ function defineProblem<const Code extends string, const Status extends number, F
   return {
     schema,
     body: (detail: string, extra: z.output<z.ZodObject<Fields>>) => ({
-      ...extra, type, title, status, detail, code,
+      ...extra,
+      type,
+      title,
+      status,
+      detail,
+      code,
     }),
   };
 }
@@ -42,9 +47,13 @@ const transitionNotAllowed = defineProblem("TRANSITION_NOT_ALLOWED", 409, "Trans
 const invalidPhase = defineProblem("INVALID_PHASE", 422, "Invalid phase", { sport: z.string(), phase: z.string() });
 const sameCompetitor = defineProblem("SAME_COMPETITOR", 422, "Same competitor", { competitorId: z.guid() });
 const sportMismatch = defineProblem("COMPETITOR_SPORT_MISMATCH", 422, "Competitor sport mismatch", {
-  competitorId: z.guid(), competitorSport: z.string(), eventSport: z.string(),
+  competitorId: z.guid(),
+  competitorSport: z.string(),
+  eventSport: z.string(),
 });
-const competitorNotFound = defineProblem("COMPETITOR_NOT_FOUND", 422, "Competitor not found", { competitorId: z.guid() });
+const competitorNotFound = defineProblem("COMPETITOR_NOT_FOUND", 422, "Competitor not found", {
+  competitorId: z.guid(),
+});
 const overloaded = defineProblem("OVERLOADED", 503, "Overloaded", {});
 const unavailable = defineProblem("UNAVAILABLE", 503, "Unavailable", {});
 const internal = defineProblem("INTERNAL", 500, "Internal error", { requestId: z.string() });
@@ -72,7 +81,10 @@ const writerErrors = {
 export const createErrors = {
   ...writerErrors,
   ...eventErrors,
-  422: problemResponse("Invalid competitors", z.union([sameCompetitor.schema, sportMismatch.schema, competitorNotFound.schema])),
+  422: problemResponse(
+    "Invalid competitors",
+    z.union([sameCompetitor.schema, sportMismatch.schema, competitorNotFound.schema]),
+  ),
 };
 export const commandErrors = {
   ...singleEventErrors,
@@ -109,14 +121,21 @@ export function eventProblem(error: CreateError | CommandError | EventNotFound |
         { currentVersion: error.currentVersion },
       );
     case "TransitionNotAllowed":
-      return transitionNotAllowed.body(`Cannot apply ${error.command} to a ${error.status} event.`, { currentStatus: error.status });
+      return transitionNotAllowed.body(`Cannot apply ${error.command} to a ${error.status} event.`, {
+        currentStatus: error.status,
+      });
     case "InvalidPhase":
-      return invalidPhase.body("The phase does not apply to the event's sport.", { sport: error.sport, phase: error.phase });
+      return invalidPhase.body("The phase does not apply to the event's sport.", {
+        sport: error.sport,
+        phase: error.phase,
+      });
     case "SameCompetitor":
       return sameCompetitor.body("Home and away must be different competitors.", { competitorId: error.competitorId });
     case "CompetitorSportMismatch":
       return sportMismatch.body("The competitor and event must have the same sport.", {
-        competitorId: error.competitorId, competitorSport: error.competitorSport, eventSport: error.eventSport,
+        competitorId: error.competitorId,
+        competitorSport: error.competitorSport,
+        eventSport: error.eventSport,
       });
     case "CompetitorNotFound":
       return competitorNotFound.body("The competitor does not exist.", { competitorId: error.competitorId });
@@ -136,15 +155,21 @@ export function transportProblem(error: unknown): Problem | undefined {
       const message = issue.message ?? "Invalid value";
       const keys = issue.params.keys;
       if (issue.keyword === "unrecognized_keys" && Array.isArray(keys)) {
-        return keys.filter((key): key is string => typeof key === "string")
+        return keys
+          .filter((key): key is string => typeof key === "string")
           .map((key) => ({ field: `${issue.instancePath === "/" ? "" : `${field}.`}${key}`, message }));
       }
       return [{ field, message }];
     });
     return validation.body("One or more request fields are invalid.", { errors });
   }
-  if (error instanceof Error && "statusCode" in error &&
-      typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500) {
+  if (
+    error instanceof Error &&
+    "statusCode" in error &&
+    typeof error.statusCode === "number" &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500
+  ) {
     const message = "The HTTP request could not be parsed or has an unsupported format.";
     return validation.body(message, { errors: [{ field: "request", message }] });
   }

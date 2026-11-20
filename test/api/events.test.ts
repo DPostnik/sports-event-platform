@@ -45,10 +45,13 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
   beforeAll(async () => {
     database = await startTestDatabase();
     await seed(database.db);
-    app = await buildService(readConfiguration({
-      DATABASE_URL: database.connectionString,
-      WRITER_KEYS: writerKeyEnvironment,
-    }), false);
+    app = await buildService(
+      readConfiguration({
+        DATABASE_URL: database.connectionString,
+        WRITER_KEYS: writerKeyEnvironment,
+      }),
+      false,
+    );
     const response = await app.inject("/openapi.json");
     expect(response.statusCode).toBe(200);
     openApi = openApiSchema.parse(JSON.parse(response.body));
@@ -78,7 +81,10 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     headers = apiWriter.headers,
   ): Promise<unknown> {
     const response = await runningApp().inject({
-      method, url, ...(method === "POST" ? { headers } : {}), ...(payload === undefined ? {} : { payload }),
+      method,
+      url,
+      ...(method === "POST" ? { headers } : {}),
+      ...(payload === undefined ? {} : { payload }),
     });
     expect(response.statusCode, response.body).toBe(status);
     await expectDocumentedResponse(openApi, method, path, response);
@@ -86,10 +92,12 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
   }
 
   async function create(externalId: string) {
-    return eventBodySchema.parse(await request("POST", "/events", "/events", 201, {
-      ...football,
-      externalId,
-    })).event;
+    return eventBodySchema.parse(
+      await request("POST", "/events", "/events", 201, {
+        ...football,
+        externalId,
+      }),
+    ).event;
   }
 
   async function command(id: string, name: string, status: number, payload: object) {
@@ -99,22 +107,30 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
   test.each([
     { payload: football, startsAt: "2025-07-18T16:30:00.000Z", home: "Salzburg", away: "Sturm" },
     { payload: hockey, startsAt: "2025-10-23T07:45:00.000Z", home: "KAC", away: "Capitals" },
-  ])("stores and reads the $payload.sport example with UTC time and competitor names", async ({ payload, startsAt, home, away }) => {
-    const created = eventBodySchema.parse(await request("POST", "/events", "/events", 201, payload));
-    expect(created.event).toMatchObject({ startsAt, status: "scheduled", version: 1, source: apiWriter.source });
-    const retrieved = await request("GET", "/events/{id}", `/events/${created.event.id}`, 200);
-    expect(retrieved).toMatchObject({ event: created.event });
-    expect(created.event.competitors).toMatchObject([
-      { name: home, role: "home" },
-      { name: away, role: "away" },
-    ]);
-  });
+  ])(
+    "stores and reads the $payload.sport example with UTC time and competitor names",
+    async ({ payload, startsAt, home, away }) => {
+      const created = eventBodySchema.parse(await request("POST", "/events", "/events", 201, payload));
+      expect(created.event).toMatchObject({ startsAt, status: "scheduled", version: 1, source: apiWriter.source });
+      const retrieved = await request("GET", "/events/{id}", `/events/${created.event.id}`, 200);
+      expect(retrieved).toMatchObject({ event: created.event });
+      expect(created.event.competitors).toMatchObject([
+        { name: home, role: "home" },
+        { name: away, role: "away" },
+      ]);
+    },
+  );
 
   describe("Writer credentials and ownership (ADR-0042)", () => {
     test("all writes challenge missing, malformed or unknown credentials", async () => {
       const writePaths = [
-        "/events", "/events/{id}/start", "/events/{id}/finish", "/events/{id}/postpone",
-        "/events/{id}/reschedule", "/events/{id}/cancel", "/events/{id}/phase",
+        "/events",
+        "/events/{id}/start",
+        "/events/{id}/finish",
+        "/events/{id}/postpone",
+        "/events/{id}/reschedule",
+        "/events/{id}/cancel",
+        "/events/{id}/phase",
       ];
       expect(openApi.components.securitySchemes).toMatchObject({ writerKey: { type: "http", scheme: "bearer" } });
       for (const path of writePaths) {
@@ -136,16 +152,18 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     });
 
     test("rejects source in the create body", async () => {
-      expect(await request("POST", "/events", "/events", 400, { ...football, source: "manual" }))
-        .toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "source" }] });
+      expect(await request("POST", "/events", "/events", 400, { ...football, source: "manual" })).toMatchObject({
+        code: "VALIDATION_FAILED",
+        errors: [{ field: "source" }],
+      });
     });
 
     test("different authenticated sources can create events with the same external ID", async () => {
       const payload = { ...football, externalId: "shared", startsAt: "2031-07-18T18:30:00Z" };
       const first = eventBodySchema.parse(await request("POST", "/events", "/events", 201, payload)).event;
-      const second = eventBodySchema.parse(await request(
-        "POST", "/events", "/events", 201, payload, manualWriter.headers,
-      )).event;
+      const second = eventBodySchema.parse(
+        await request("POST", "/events", "/events", 201, payload, manualWriter.headers),
+      ).event;
       expect(first).toMatchObject({ source: apiWriter.source });
       expect(second).toMatchObject({ source: manualWriter.source });
       expect(second.id).not.toBe(first.id);
@@ -153,9 +171,16 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
     test("refuses a foreign command before checking its version and lifecycle", async () => {
       const { id } = await create("foreign-command");
-      expect(await request(
-        "POST", "/events/{id}/finish", `/events/${id}/finish`, 403, { expectedVersion: 99 }, manualWriter.headers,
-      )).toMatchObject({ code: "FORBIDDEN" });
+      expect(
+        await request(
+          "POST",
+          "/events/{id}/finish",
+          `/events/${id}/finish`,
+          403,
+          { expectedVersion: 99 },
+          manualWriter.headers,
+        ),
+      ).toMatchObject({ code: "FORBIDDEN" });
     });
 
     test("keeps the read operations public in OpenAPI", () => {
@@ -185,9 +210,13 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
   test("revalidates a list page by event versions and its next cursor (ADR-0039)", async () => {
     const url = "/events?from=2030-01-01T00:00:00Z&to=2030-01-02T00:00:00Z&limit=1";
-    const firstEvent = eventBodySchema.parse(await request("POST", "/events", "/events", 201, {
-      ...football, externalId: "etag-first", startsAt: "2030-01-01T10:00:00Z",
-    })).event;
+    const firstEvent = eventBodySchema.parse(
+      await request("POST", "/events", "/events", 201, {
+        ...football,
+        externalId: "etag-first",
+        startsAt: "2030-01-01T10:00:00Z",
+      }),
+    ).event;
     const first = await runningApp().inject(url);
     const tag = z.string().startsWith('W/"').parse(first.headers.etag);
     const headers = { "if-none-match": tag };
@@ -198,7 +227,9 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
     // Only nextCursor changes on the first page when a second page appears.
     await request("POST", "/events", "/events", 201, {
-      ...football, externalId: "etag-second", startsAt: "2030-01-01T11:00:00Z",
+      ...football,
+      externalId: "etag-second",
+      startsAt: "2030-01-01T11:00:00Z",
     });
     const paged = await runningApp().inject({ url, headers });
     expect(paged.statusCode).toBe(200);
@@ -249,52 +280,63 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
   test("starts an event, changes its phase and finishes it (ADR-0010)", async () => {
     const { id } = await create("live");
-    expect(await command(id, "start", 200, { expectedVersion: 1, phase: "1st_half" }))
-      .toMatchObject({ event: { status: "live", phase: "1st_half", version: 2 } });
-    expect(await command(id, "phase", 200, { expectedVersion: 2, phase: "2nd_half" }))
-      .toMatchObject({ event: { status: "live", phase: "2nd_half", version: 3 } });
-    expect(await command(id, "finish", 200, { expectedVersion: 3 }))
-      .toMatchObject({ event: { status: "finished", version: 4 } });
+    expect(await command(id, "start", 200, { expectedVersion: 1, phase: "1st_half" })).toMatchObject({
+      event: { status: "live", phase: "1st_half", version: 2 },
+    });
+    expect(await command(id, "phase", 200, { expectedVersion: 2, phase: "2nd_half" })).toMatchObject({
+      event: { status: "live", phase: "2nd_half", version: 3 },
+    });
+    expect(await command(id, "finish", 200, { expectedVersion: 3 })).toMatchObject({
+      event: { status: "finished", version: 4 },
+    });
   });
 
   test("postpones, reschedules and cancels an event (ADR-0010)", async () => {
     const { id } = await create("cancel");
-    expect(await command(id, "postpone", 200, { expectedVersion: 1 }))
-      .toMatchObject({ event: { status: "postponed", version: 2 } });
-    expect(await command(id, "reschedule", 200, { expectedVersion: 2, startsAt: "2025-07-20T19:00:00Z" }))
-      .toMatchObject({ event: { status: "scheduled", version: 3, startsAt: "2025-07-20T19:00:00.000Z" } });
-    expect(await command(id, "cancel", 200, { expectedVersion: 3 }))
-      .toMatchObject({ event: { status: "cancelled", version: 4 } });
+    expect(await command(id, "postpone", 200, { expectedVersion: 1 })).toMatchObject({
+      event: { status: "postponed", version: 2 },
+    });
+    expect(
+      await command(id, "reschedule", 200, { expectedVersion: 2, startsAt: "2025-07-20T19:00:00Z" }),
+    ).toMatchObject({ event: { status: "scheduled", version: 3, startsAt: "2025-07-20T19:00:00.000Z" } });
+    expect(await command(id, "cancel", 200, { expectedVersion: 3 })).toMatchObject({
+      event: { status: "cancelled", version: 4 },
+    });
   });
 
   test("rejects a start time without a zone with a field error (ADR-0005, ADR-0037)", async () => {
-    expect(await request("POST", "/events", "/events", 400, { ...football, startsAt: "2025-07-18T18:30:00" }))
-      .toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "startsAt" }] });
+    expect(
+      await request("POST", "/events", "/events", 400, { ...football, startsAt: "2025-07-18T18:30:00" }),
+    ).toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "startsAt" }] });
   });
 
   test.each(["0", "101", "1.5", "abc"])("rejects the invalid list limit %s (ADR-0029)", async (limit) => {
-    expect(await request("GET", "/events", `/events?limit=${limit}`, 400))
-      .toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "limit" }] });
+    expect(await request("GET", "/events", `/events?limit=${limit}`, 400)).toMatchObject({
+      code: "VALIDATION_FAILED",
+      errors: [{ field: "limit" }],
+    });
   });
 
   test("rejects a cursor with an invalid position (ADR-0012)", async () => {
-    expect(await request("GET", "/events", "/events?cursor=invalid", 400))
-      .toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "cursor" }] });
+    expect(await request("GET", "/events", "/events?cursor=invalid", 400)).toMatchObject({
+      code: "VALIDATION_FAILED",
+      errors: [{ field: "cursor" }],
+    });
   });
 
   test("reports a missing event as NOT_FOUND (ADR-0037)", async () => {
-    expect(await request("GET", "/events/{id}", `/events/${MISSING_ID}`, 404))
-      .toMatchObject({ code: "NOT_FOUND" });
+    expect(await request("GET", "/events/{id}", `/events/${MISSING_ID}`, 404)).toMatchObject({ code: "NOT_FOUND" });
   });
 
   test("returns a conflict with the stored version when two commands race (ADR-0009)", async () => {
     const { id } = await create("version");
-    const sendStart = () => runningApp().inject({
-      method: "POST",
-      url: `/events/${id}/start`,
-      headers: apiWriter.headers,
-      payload: { expectedVersion: 1 },
-    });
+    const sendStart = () =>
+      runningApp().inject({
+        method: "POST",
+        url: `/events/${id}/start`,
+        headers: apiWriter.headers,
+        payload: { expectedVersion: 1 },
+      });
     const outcomes = await Promise.all([sendStart(), sendStart()]);
     expect(outcomes.map((response) => response.statusCode).sort()).toEqual([200, 409]);
     for (const response of outcomes) {
@@ -307,14 +349,19 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
   test("reports the stored status when a transition is refused (ADR-0037)", async () => {
     const { id } = await create("transition");
-    expect(await command(id, "finish", 409, { expectedVersion: 1 }))
-      .toMatchObject({ code: "TRANSITION_NOT_ALLOWED", currentStatus: "scheduled" });
+    expect(await command(id, "finish", 409, { expectedVersion: 1 })).toMatchObject({
+      code: "TRANSITION_NOT_ALLOWED",
+      currentStatus: "scheduled",
+    });
   });
 
   test("identifies a phase from another sport (ADR-0037)", async () => {
     const { id } = await create("phase");
-    expect(await command(id, "start", 422, { expectedVersion: 1, phase: "3rd_period" }))
-      .toMatchObject({ code: "INVALID_PHASE", sport: "football", phase: "3rd_period" });
+    expect(await command(id, "start", 422, { expectedVersion: 1, phase: "3rd_period" })).toMatchObject({
+      code: "INVALID_PHASE",
+      sport: "football",
+      phase: "3rd_period",
+    });
   });
 
   test.each([
@@ -325,11 +372,13 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     },
     { code: "COMPETITOR_NOT_FOUND", members: { competitorId: MISSING_ID } },
   ])("reports $code for a well-formed create (ADR-0037)", async ({ code, members }) => {
-    expect(await request("POST", "/events", "/events", 422, {
-      ...football,
-      externalId: code,
-      awayCompetitorId: members.competitorId,
-    })).toMatchObject({ code, ...members });
+    expect(
+      await request("POST", "/events", "/events", 422, {
+        ...football,
+        externalId: code,
+        awayCompetitorId: members.competitorId,
+      }),
+    ).toMatchObject({ code, ...members });
   });
 
   test("returns a generic problem when a query fails unexpectedly (ADR-0018)", async () => {
@@ -339,8 +388,9 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     await sql`ALTER TABLE events RENAME TO unavailable_events`.execute(database.db);
     try {
       const body = await request("GET", "/events", "/events", 500);
-      expect(z.object({ code: z.literal("INTERNAL"), requestId: z.string().min(1) }).safeParse(body).success)
-        .toBe(true);
+      expect(z.object({ code: z.literal("INTERNAL"), requestId: z.string().min(1) }).safeParse(body).success).toBe(
+        true,
+      );
       expect(JSON.stringify(body)).not.toMatch(/relation|does not exist|unavailable_events/);
     } finally {
       await sql`ALTER TABLE unavailable_events RENAME TO events`.execute(database.db);

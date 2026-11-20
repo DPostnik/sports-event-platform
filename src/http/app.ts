@@ -1,7 +1,12 @@
 import { createHash } from "node:crypto";
 import swagger from "@fastify/swagger";
 import Fastify, { type FastifyReply, type FastifyRequest, type onRequestHookHandler } from "fastify";
-import { jsonSchemaTransform, serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
+import {
+  jsonSchemaTransform,
+  serializerCompiler,
+  validatorCompiler,
+  type ZodTypeProvider,
+} from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Cache } from "#src/application/cache.ts";
 import type { Clock } from "#src/application/clock.ts";
@@ -83,7 +88,16 @@ function authenticatedSource(request: FastifyRequest): string {
 }
 
 export async function buildApp(options: AppOptions) {
-  const { events, writerKeys, clock, cache, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
+  const {
+    events,
+    writerKeys,
+    clock,
+    cache,
+    checkReadiness,
+    databaseFailure,
+    retryAfterSeconds,
+    logger = false,
+  } = options;
   const eventReads = new InFlightReads<Result<z.output<typeof eventResponse>, EventNotFound>>();
   const pageReads = new InFlightReads<z.output<typeof listResponse>>();
 
@@ -155,7 +169,11 @@ export async function buildApp(options: AppOptions) {
     return { body: cached, age };
   }
 
-  async function readCached<T extends { generatedAt: string }>(key: string, schema: z.ZodType<T>, request: FastifyRequest) {
+  async function readCached<T extends { generatedAt: string }>(
+    key: string,
+    schema: z.ZodType<T>,
+    request: FastifyRequest,
+  ) {
     try {
       const raw = await cache?.get(key);
       if (raw === undefined) return undefined;
@@ -176,9 +194,7 @@ export async function buildApp(options: AppOptions) {
 
   const authenticateWriter: onRequestHookHandler = (request, reply, done) => {
     const key = /^Bearer +([A-Za-z0-9._~+/-]+=*)$/i.exec(request.headers.authorization ?? "")?.[1];
-    const source = key === undefined
-      ? undefined
-      : writerKeys.get(createHash("sha256").update(key).digest("hex"));
+    const source = key === undefined ? undefined : writerKeys.get(createHash("sha256").update(key).digest("hex"));
     if (source === undefined) {
       sendProblem(reply.header("WWW-Authenticate", writerChallenge), writerAuthenticationProblem());
       return;
@@ -187,97 +203,111 @@ export async function buildApp(options: AppOptions) {
     done();
   };
 
-  app.post("/events", {
-    onRequest: authenticateWriter,
-    schema: {
-      security: writerSecurity,
-      summary: "Create an event or return the stored event for the source identity",
-      querystring: emptyQuery,
-      body: createBody,
-      response: { 200: eventResponse, 201: eventResponse, ...createErrors },
+  app.post(
+    "/events",
+    {
+      onRequest: authenticateWriter,
+      schema: {
+        security: writerSecurity,
+        summary: "Create an event or return the stored event for the source identity",
+        querystring: emptyQuery,
+        body: createBody,
+        response: { 200: eventResponse, 201: eventResponse, ...createErrors },
+      },
     },
-  }, async (request, reply) => {
-    const result = await events.create({ ...request.body, source: authenticatedSource(request) });
-    if (!result.ok) return sendProblem(reply, eventProblem(result.error));
-    const { view, created } = result.value;
-    if (created) eventReads.invalidate(`event:${view.event.id}`);
-    return reply.code(created ? 201 : 200).send(singleEvent(view));
-  });
+    async (request, reply) => {
+      const result = await events.create({ ...request.body, source: authenticatedSource(request) });
+      if (!result.ok) return sendProblem(reply, eventProblem(result.error));
+      const { view, created } = result.value;
+      if (created) eventReads.invalidate(`event:${view.event.id}`);
+      return reply.code(created ? 201 : 200).send(singleEvent(view));
+    },
+  );
 
-  app.get("/events/:id", {
-    schema: {
-      summary: "Get an event",
-      params: eventParams,
-      querystring: emptyQuery,
-      headers: conditionalHeaders,
-      response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
+  app.get(
+    "/events/:id",
+    {
+      schema: {
+        summary: "Get an event",
+        params: eventParams,
+        querystring: emptyQuery,
+        headers: conditionalHeaders,
+        response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
+      },
     },
-  }, async (request, reply) => {
-    const id = request.params.id;
-    const key = `event:${id}`;
-    let entry = await readCached(key, eventResponse, request);
-    if (entry?.body.event.id !== id) entry = undefined;
-    if (!entry || entry.age >= freshSeconds) {
-      try {
-        const loaded = await eventReads.run(key, async () => {
-          const result = await events.get(id);
-          if (!result.ok) return result;
-          const body = singleEvent(result.value);
-          await cacheResponse(key, body, request);
-          return ok(body);
-        });
-        if (!loaded.ok) return await sendProblem(reply, eventProblem(loaded.error));
-        entry = { body: loaded.value, age: 0 };
-      } catch (err) {
-        entry = staleAfterFailure(err, entry?.body);
+    async (request, reply) => {
+      const id = request.params.id;
+      const key = `event:${id}`;
+      let entry = await readCached(key, eventResponse, request);
+      if (entry?.body.event.id !== id) entry = undefined;
+      if (!entry || entry.age >= freshSeconds) {
+        try {
+          const loaded = await eventReads.run(key, async () => {
+            const result = await events.get(id);
+            if (!result.ok) return result;
+            const body = singleEvent(result.value);
+            await cacheResponse(key, body, request);
+            return ok(body);
+          });
+          if (!loaded.ok) return await sendProblem(reply, eventProblem(loaded.error));
+          entry = { body: loaded.value, age: 0 };
+        } catch (err) {
+          entry = staleAfterFailure(err, entry?.body);
+        }
       }
-    }
-    const opaqueTag = `"${String(entry.body.event.version)}"`;
-    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
-    if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
-      return reply.code(304).send(null);
-    }
-    return entry.body;
-  });
+      const opaqueTag = `"${String(entry.body.event.version)}"`;
+      reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
+      if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
+        return reply.code(304).send(null);
+      }
+      return entry.body;
+    },
+  );
 
-  app.get("/events", {
-    schema: {
-      summary: "List events by start time and ID",
-      querystring: listQuery,
-      headers: conditionalHeaders,
-      response: { 200: listResponse, 304: z.null().describe("List page unchanged"), ...eventErrors },
+  app.get(
+    "/events",
+    {
+      schema: {
+        summary: "List events by start time and ID",
+        querystring: listQuery,
+        headers: conditionalHeaders,
+        response: { 200: listResponse, 304: z.null().describe("List page unchanged"), ...eventErrors },
+      },
     },
-  }, async (request, reply) => {
-    const { sport, status, from, to, competitor, cursor, limit = 50 } = request.query;
-    const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
-    let entry = await readCached(key, listResponse, request);
-    if (!entry || entry.age >= freshSeconds) {
-      try {
-        const body = await pageReads.run(key, async () => {
-          const page = await events.list(toEventFilters(request.query), cursor, limit);
-          const response = {
-            generatedAt: clock.now().toISOString(),
-            events: page.views.map(toEventResponse),
-            nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
-          };
-          await cacheResponse(key, response, request);
-          return response;
-        });
-        entry = { body, age: 0 };
-      } catch (err) {
-        entry = staleAfterFailure(err, entry?.body);
+    async (request, reply) => {
+      const { sport, status, from, to, competitor, cursor, limit = 50 } = request.query;
+      const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
+      let entry = await readCached(key, listResponse, request);
+      if (!entry || entry.age >= freshSeconds) {
+        try {
+          const body = await pageReads.run(key, async () => {
+            const page = await events.list(toEventFilters(request.query), cursor, limit);
+            const response = {
+              generatedAt: clock.now().toISOString(),
+              events: page.views.map(toEventResponse),
+              nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
+            };
+            await cacheResponse(key, response, request);
+            return response;
+          });
+          entry = { body, age: 0 };
+        } catch (err) {
+          entry = staleAfterFailure(err, entry?.body);
+        }
       }
-    }
-    const { events: items, nextCursor } = entry.body;
-    const versions = items.map(({ id, version }) => [id, version]);
-    const hash = createHash("sha256").update(JSON.stringify([versions, nextCursor])).digest("base64url");
-    const opaqueTag = `"${hash}"`;
-    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "max-age=60").header("Age", String(entry.age));
-    if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
-      return reply.code(304).send(null);
-    }
-    return entry.body;
-  });
+      const { events: items, nextCursor } = entry.body;
+      const versions = items.map(({ id, version }) => [id, version]);
+      const hash = createHash("sha256")
+        .update(JSON.stringify([versions, nextCursor]))
+        .digest("base64url");
+      const opaqueTag = `"${hash}"`;
+      reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "max-age=60").header("Age", String(entry.age));
+      if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
+        return reply.code(304).send(null);
+      }
+      return entry.body;
+    },
+  );
 
   async function runCommand(request: FastifyRequest, id: EventId, command: Command, reply: FastifyReply) {
     const result = await events.command(id, command, authenticatedSource(request));
@@ -297,73 +327,114 @@ export async function buildApp(options: AppOptions) {
     body: versionBody,
     response: { 200: eventResponse, ...commandErrors },
   };
-  app.post("/events/:id/start", {
-    onRequest: authenticateWriter,
-    schema: {
-      ...basicCommandSchema,
-      summary: "Start a scheduled event",
-      body: startBody,
-      response: { 200: eventResponse, ...phaseCommandErrors },
+  app.post(
+    "/events/:id/start",
+    {
+      onRequest: authenticateWriter,
+      schema: {
+        ...basicCommandSchema,
+        summary: "Start a scheduled event",
+        body: startBody,
+        response: { 200: eventResponse, ...phaseCommandErrors },
+      },
     },
-  }, (request, reply) => {
-    const { expectedVersion, phase } = request.body;
-    return runCommand(request, request.params.id, {
-      kind: "start",
-      expectedVersion,
-      ...(phase === undefined ? {} : { phase }),
-    }, reply);
-  });
-  app.post("/events/:id/finish", {
-    onRequest: authenticateWriter,
-    schema: { ...basicCommandSchema, summary: "Finish a live event" },
-  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "finish" }, reply));
-  app.post("/events/:id/postpone", {
-    onRequest: authenticateWriter,
-    schema: { ...basicCommandSchema, summary: "Postpone a scheduled event" },
-  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "postpone" }, reply));
-  app.post("/events/:id/reschedule", {
-    onRequest: authenticateWriter,
-    schema: { ...basicCommandSchema, summary: "Set a new start time", body: rescheduleBody },
-  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "reschedule" }, reply));
-  app.post("/events/:id/cancel", {
-    onRequest: authenticateWriter,
-    schema: { ...basicCommandSchema, summary: "Cancel a scheduled or postponed event" },
-  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "cancel" }, reply));
-  app.post("/events/:id/phase", {
-    onRequest: authenticateWriter,
-    schema: {
-      ...basicCommandSchema,
-      summary: "Change the phase of a live event",
-      body: phaseBody,
-      response: { 200: eventResponse, ...phaseCommandErrors },
+    (request, reply) => {
+      const { expectedVersion, phase } = request.body;
+      return runCommand(
+        request,
+        request.params.id,
+        {
+          kind: "start",
+          expectedVersion,
+          ...(phase === undefined ? {} : { phase }),
+        },
+        reply,
+      );
     },
-  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "changePhase" }, reply));
+  );
+  app.post(
+    "/events/:id/finish",
+    {
+      onRequest: authenticateWriter,
+      schema: { ...basicCommandSchema, summary: "Finish a live event" },
+    },
+    (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "finish" }, reply),
+  );
+  app.post(
+    "/events/:id/postpone",
+    {
+      onRequest: authenticateWriter,
+      schema: { ...basicCommandSchema, summary: "Postpone a scheduled event" },
+    },
+    (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "postpone" }, reply),
+  );
+  app.post(
+    "/events/:id/reschedule",
+    {
+      onRequest: authenticateWriter,
+      schema: { ...basicCommandSchema, summary: "Set a new start time", body: rescheduleBody },
+    },
+    (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "reschedule" }, reply),
+  );
+  app.post(
+    "/events/:id/cancel",
+    {
+      onRequest: authenticateWriter,
+      schema: { ...basicCommandSchema, summary: "Cancel a scheduled or postponed event" },
+    },
+    (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "cancel" }, reply),
+  );
+  app.post(
+    "/events/:id/phase",
+    {
+      onRequest: authenticateWriter,
+      schema: {
+        ...basicCommandSchema,
+        summary: "Change the phase of a live event",
+        body: phaseBody,
+        response: { 200: eventResponse, ...phaseCommandErrors },
+      },
+    },
+    (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "changePhase" }, reply),
+  );
 
-  app.get("/health", {
-    schema: {
-      summary: "Check service liveness",
-      querystring: emptyQuery,
-      response: { 200: healthResponse, ...baseErrors },
+  app.get(
+    "/health",
+    {
+      schema: {
+        summary: "Check service liveness",
+        querystring: emptyQuery,
+        response: { 200: healthResponse, ...baseErrors },
+      },
     },
-  }, () => ({ status: "ok" }));
-  app.get("/ready", {
-    schema: {
-      summary: "Check database readiness",
-      querystring: emptyQuery,
-      response: { 200: healthResponse, ...eventErrors },
+    () => ({ status: "ok" }),
+  );
+  app.get(
+    "/ready",
+    {
+      schema: {
+        summary: "Check database readiness",
+        querystring: emptyQuery,
+        response: { 200: healthResponse, ...eventErrors },
+      },
     },
-  }, async (request, reply) => {
-    try {
-      await checkReadiness();
-    } catch (error) {
-      request.log.warn({ err: error }, "Database readiness check failed");
-      return sendDatabaseProblem(reply, databaseFailure(error) ?? "UNAVAILABLE");
-    }
-    return { status: "ok" };
-  });
-  app.get("/openapi.json", {
-    schema: { hide: true, querystring: emptyQuery, response: { 200: z.looseObject({}), ...baseErrors } },
-  }, () => ({ ...app.swagger() }));
+    async (request, reply) => {
+      try {
+        await checkReadiness();
+      } catch (error) {
+        request.log.warn({ err: error }, "Database readiness check failed");
+        return sendDatabaseProblem(reply, databaseFailure(error) ?? "UNAVAILABLE");
+      }
+      return { status: "ok" };
+    },
+  );
+  app.get(
+    "/openapi.json",
+    {
+      schema: { hide: true, querystring: emptyQuery, response: { 200: z.looseObject({}), ...baseErrors } },
+    },
+    () => ({ ...app.swagger() }),
+  );
 
   return app;
 }

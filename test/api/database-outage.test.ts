@@ -11,7 +11,7 @@ describe("Cached reads during a database outage (ADR-0016, ADR-0040)", () => {
   it("serves event and list copies until the one-hour limit after PostgreSQL stops", async ({ onTestFinished }) => {
     const database = await startTestDatabase();
     let stopping: Promise<void> | undefined;
-    const stopDatabase = () => stopping ??= database.stop();
+    const stopDatabase = () => (stopping ??= database.stop());
     onTestFinished(stopDatabase);
     await seed(database.db);
 
@@ -19,20 +19,27 @@ describe("Cached reads during a database outage (ADR-0016, ADR-0040)", () => {
       .withExposedPorts(6379)
       .withWaitStrategy(Wait.forLogMessage("Ready to accept connections"))
       .start();
-    onTestFinished(async () => { await redis.stop(); });
-    const app = await buildService(readConfiguration({
-      DATABASE_URL: database.connectionString,
-      WRITER_KEYS: writerKeyEnvironment,
-      REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
-    }), false);
+    onTestFinished(async () => {
+      await redis.stop();
+    });
+    const app = await buildService(
+      readConfiguration({
+        DATABASE_URL: database.connectionString,
+        WRITER_KEYS: writerKeyEnvironment,
+        REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
+      }),
+      false,
+    );
     onTestFinished(() => app.close());
 
     const eventUrl = `/events/${EVENT_FIELDS.id}`;
     const urls = [eventUrl, "/events?limit=1"];
-    await expect.poll(async () => {
-      for (const url of urls) await app.inject(url);
-      return (await redis.exec(["redis-cli", "DBSIZE"])).output.trim();
-    }).toBe("2");
+    await expect
+      .poll(async () => {
+        for (const url of urls) await app.inject(url);
+        return (await redis.exec(["redis-cli", "DBSIZE"])).output.trim();
+      })
+      .toBe("2");
 
     // Advance only the service date. Network and container timers keep running.
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -60,7 +67,10 @@ describe("Cached reads during a database outage (ADR-0016, ADR-0040)", () => {
       expect(miss.statusCode).toBe(503);
       expect(miss.json<unknown>()).toMatchObject({ code: "UNAVAILABLE" });
       const write = await app.inject({
-        method: "POST", url: `${eventUrl}/start`, headers: manualWriter.headers, payload: { expectedVersion: 1 },
+        method: "POST",
+        url: `${eventUrl}/start`,
+        headers: manualWriter.headers,
+        payload: { expectedVersion: 1 },
       });
       expect(write.statusCode).toBe(503);
       expect(write.json<unknown>()).toMatchObject({ code: "UNAVAILABLE" });

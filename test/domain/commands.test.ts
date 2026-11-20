@@ -35,14 +35,7 @@ const ALLOWED: readonly (readonly [CommandKind, EventStatus, EventStatus])[] = [
   ["changePhase", "live", "live"],
 ];
 
-const COMMAND_KINDS: readonly CommandKind[] = [
-  "start",
-  "finish",
-  "postpone",
-  "reschedule",
-  "cancel",
-  "changePhase",
-];
+const COMMAND_KINDS: readonly CommandKind[] = ["start", "finish", "postpone", "reschedule", "cancel", "changePhase"];
 
 describe("Lifecycle (ADR-0002, ADR-0010)", () => {
   it.each(ALLOWED)("%s from %s gives %s and advances the version", (kind, from, to) => {

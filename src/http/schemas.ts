@@ -20,12 +20,17 @@ const competitorId = uuid.transform((value, context) => {
 });
 
 const sport = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
-const externalId = z.string().min(1).max(128).refine((value) => !value.includes("\0"), {
-  message: "The external ID must not contain a null character",
-});
+const externalId = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine((value) => !value.includes("\0"), {
+    message: "The external ID must not contain a null character",
+  });
 const phase = z.string().min(1);
 const version = z.int().min(1).max(2_147_483_647);
-const instant = z.iso.datetime({ offset: true })
+const instant = z.iso
+  .datetime({ offset: true })
   .describe("An ISO 8601 date and time with an explicit offset or Z.")
   .transform((value, context) => {
     const date = new Date(value);
@@ -50,14 +55,19 @@ export const rescheduleBody = versionBody.extend({ startsAt: instant });
 export const phaseBody = versionBody.extend({ phase });
 
 const cursorParts = z.strictObject({ startsAt: instant, id: eventId });
-const cursor = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/)
+const cursor = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9_-]+$/)
   .transform((value, context) => {
     const [startsAt, id] = Buffer.from(value, "base64url").toString("utf8").split("|");
     const parsed = cursorParts.safeParse({ startsAt, id });
     if (parsed.success && encodeCursor(parsed.data) === value) return parsed.data;
     context.addIssue({ code: "custom", message: "Expected a cursor from a previous page" });
     return z.NEVER;
-  }).describe("Pass nextCursor from the previous page with the same filters.");
+  })
+  .describe("Pass nextCursor from the previous page with the same filters.");
 
 export function encodeCursor(cursor: EventCursor): string {
   const position = `${cursor.startsAt.toISOString()}|${cursor.id}`;
@@ -71,8 +81,12 @@ export const listQuery = z.strictObject({
   to: instant.describe("Exclusive end of the time window.").optional(),
   competitor: competitorId.optional(),
   cursor: cursor.optional(),
-  limit: z.string().regex(/^(?:[1-9][0-9]?|100)$/).transform(Number)
-    .describe("An integer from 1 to 100. Default is 50.").optional(),
+  limit: z
+    .string()
+    .regex(/^(?:[1-9][0-9]?|100)$/)
+    .transform(Number)
+    .describe("An integer from 1 to 100. Default is 50.")
+    .optional(),
 });
 
 export function toEventFilters({ sport, status, from, to, competitor }: z.output<typeof listQuery>): EventFilters {

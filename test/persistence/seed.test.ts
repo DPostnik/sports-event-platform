@@ -27,9 +27,7 @@ describe("Seed data (ADR-0027)", () => {
     const page = await createEventRepository(db).list({}, undefined, 50);
     expect(sports.map((sport) => sport.code)).toEqual(["football", "ice_hockey"]);
     expect(competitors.map((competitor) => competitor.name)).toEqual(["Capitals", "KAC", "Salzburg", "Sturm"]);
-    expect(
-      page.views.map((view) => [view.homeName, view.awayName, view.event.startsAt.toISOString()]),
-    ).toEqual([
+    expect(page.views.map((view) => [view.homeName, view.awayName, view.event.startsAt.toISOString()])).toEqual([
       ["Salzburg", "Sturm", "2025-07-18T16:30:00.000Z"],
       ["KAC", "Capitals", "2025-10-23T07:45:00.000Z"],
     ]);

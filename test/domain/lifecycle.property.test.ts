@@ -41,10 +41,7 @@ function toCommand(event: Event, { kind, phase, wrongVersion }: Step): Command {
 // Applies the steps one by one to a new scheduled football event. After each
 // step it calls `check` with the event before, the event after and whether
 // the command was applied.
-function run(
-  stepList: readonly Step[],
-  check: (before: Event, after: Event, applied: boolean) => void,
-): void {
+function run(stepList: readonly Step[], check: (before: Event, after: Event, applied: boolean) => void): void {
   let event: Event = { ...EVENT_FIELDS, status: "scheduled" };
   for (const next of stepList) {
     const before = structuredClone(event);

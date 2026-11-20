@@ -35,10 +35,14 @@ describe("Handle a command that loses a version-checked write (ADR-0030)", () =>
     };
     const useCases = new EventUseCases(repository, { next: unexpectedRepositoryCall });
 
-    const result = await useCases.command(SCHEDULED.event.id, {
-      kind: "start",
-      expectedVersion: 1,
-    }, SCHEDULED.event.source);
+    const result = await useCases.command(
+      SCHEDULED.event.id,
+      {
+        kind: "start",
+        expectedVersion: 1,
+      },
+      SCHEDULED.event.source,
+    );
 
     expect(result).toEqual({
       ok: false,

@@ -1,9 +1,7 @@
 // Expected failures are values, not exceptions (AGENTS.md). A function returns
 // either a value or an error, and the caller must check `ok` before it can
 // read either one.
-export type Result<T, E> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly error: E };
+export type Result<T, E> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: E };
 
 export function ok<T>(value: T): Result<T, never> {
   return { ok: true, value };

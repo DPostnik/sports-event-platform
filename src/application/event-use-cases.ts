@@ -22,8 +22,7 @@ export interface CreateEventInput {
 }
 
 export type CreateError =
-  | CreateEventError
-  | { readonly kind: "CompetitorNotFound"; readonly competitorId: CompetitorId };
+  CreateEventError | { readonly kind: "CompetitorNotFound"; readonly competitorId: CompetitorId };
 
 export interface EventNotFound {
   readonly kind: "EventNotFound";
@@ -44,10 +43,7 @@ export class EventUseCases {
   }
 
   async create(input: CreateEventInput): Promise<Result<CreateResult, CreateError>> {
-    const competitors = await this.repository.findCompetitors([
-      input.homeCompetitorId,
-      input.awayCompetitorId,
-    ]);
+    const competitors = await this.repository.findCompetitors([input.homeCompetitorId, input.awayCompetitorId]);
     const home = competitors.find((competitor) => competitor.id === input.homeCompetitorId);
     if (home === undefined) {
       return this.resolveRefusedCreate(input, {

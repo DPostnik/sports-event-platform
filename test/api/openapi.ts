@@ -26,8 +26,8 @@ export async function expectDocumentedResponse(
   response: { statusCode: number; headers: Record<string, unknown>; body: string },
 ): Promise<void> {
   const contentType = String(response.headers["content-type"]).split(";")[0]?.trim() ?? "";
-  const schema = document.paths[path]?.[method.toLowerCase()]?.responses[response.statusCode]
-    ?.content?.[contentType]?.schema;
+  const schema =
+    document.paths[path]?.[method.toLowerCase()]?.responses[response.statusCode]?.content?.[contentType]?.schema;
   if (schema === undefined) {
     throw new Error(`OpenAPI is missing ${method} ${path} ${String(response.statusCode)} ${contentType}`);
   }
@@ -37,8 +37,8 @@ export async function expectDocumentedResponse(
   const validator = fastify({
     ajv: { customOptions: { strictSchema: false, coerceTypes: false, useDefaults: false, removeAdditional: false } },
   });
-  validator.post("/", { schema: { body: { ...schema, components: document.components } } },
-    (_request, reply) => reply.code(204).send(),
+  validator.post("/", { schema: { body: { ...schema, components: document.components } } }, (_request, reply) =>
+    reply.code(204).send(),
   );
 
   try {

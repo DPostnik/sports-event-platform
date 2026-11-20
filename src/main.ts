@@ -27,11 +27,14 @@ export async function buildService(config: Configuration, logger = true) {
     },
   });
 
-  const redis = config.redisUrl === undefined ? undefined : createClient({
-    url: config.redisUrl,
-    disableOfflineQueue: true,
-    commandOptions: { timeout: 200 },
-  });
+  const redis =
+    config.redisUrl === undefined
+      ? undefined
+      : createClient({
+          url: config.redisUrl,
+          disableOfflineQueue: true,
+          commandOptions: { timeout: 200 },
+        });
   try {
     const app = await buildApp({
       events,

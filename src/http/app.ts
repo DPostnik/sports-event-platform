@@ -301,7 +301,10 @@ export async function buildApp(options: AppOptions) {
         .update(JSON.stringify([versions, nextCursor]))
         .digest("base64url");
       const opaqueTag = `"${hash}"`;
-      reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "max-age=60").header("Age", String(entry.age));
+      reply
+        .header("ETag", `W/${opaqueTag}`)
+        .header("Cache-Control", `max-age=${String(freshSeconds)}`)
+        .header("Age", String(entry.age));
       if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
         return reply.code(304).send();
       }

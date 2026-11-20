@@ -1,6 +1,6 @@
 # ADR-0007: Source identity and single ownership of an event
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0028](0028-source-ownership-needs-authentication.md)
 
 Date: 2026-11-19
 

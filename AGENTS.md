@@ -43,7 +43,7 @@ Import rules, enforced by the linter:
 
 - Strict settings stay on: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`.
 - No `any`. No non-null assertion (`!`). No `@ts-ignore`. A type cast (`as`) is allowed only inside a constructor of a branded type or a mapper, directly after validation.
-- Identifiers and validated values are branded types created only through a validating constructor.
+- Event and competitor identifiers are branded types created only through a validating constructor (ADR-0033). Other values are plain `string`, `number` and `Date`, checked at the HTTP boundary.
 - State that varies by status is a discriminated union. Every `switch` over a union ends with an exhaustive `never` check.
 - Expected failures are values, not exceptions: domain and application functions return a `Result` with a typed error. Exceptions are for bugs and for infrastructure failures, and are translated at the boundary.
 - The domain does not read the clock or generate IDs by itself. Time and IDs come in through ports.

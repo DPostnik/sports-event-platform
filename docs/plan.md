@@ -61,7 +61,8 @@ Done when: `npm test` passes on all levels.
 - `README.md` with every section the brief requires, built from the ADRs.
 - `AI_Reflection.txt`.
 - `docs/api-examples.md` with curl commands and sample responses.
-- GitHub Actions: lint, typecheck and all test levels.
+- Set up Prettier with npm scripts to format files and check formatting.
+- GitHub Actions: check formatting, lint, typecheck and run all test levels.
 - A fresh clone check: follow the README from zero on a clean checkout.
 
 Done when: a reviewer with Node.js and Docker can clone, start and exercise the service using only the README.

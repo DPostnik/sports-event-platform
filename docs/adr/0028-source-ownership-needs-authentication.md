@@ -1,6 +1,6 @@
 # ADR-0028: Source ownership is recorded, and enforcing it requires authentication
 
-Status: Accepted
+Status: Superseded by [ADR-0042](0042-writer-authentication.md)
 
 Date: 2026-11-20
 

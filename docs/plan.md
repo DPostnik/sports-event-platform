@@ -56,6 +56,14 @@ Done when: `test:api` passes and the two example events of the brief can be crea
 
 Done when: `npm test` passes on all levels.
 
+## Step 5a - Writer authentication
+
+- Require a bearer key on create and all six command routes, as approved in [ADR-0042](adr/0042-writer-authentication.md).
+- Derive the source from the configured hash mapping on create and check ownership before a command reaches the domain.
+- Document the security scheme, problems and runnable examples. Cover authentication and ownership in API tests.
+
+Done when: `typecheck`, `lint` and `test:api` pass.
+
 ## Step 6 - Submission
 
 - `README.md` with every section the brief requires, built from the ADRs.

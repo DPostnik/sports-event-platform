@@ -1,6 +1,6 @@
 # ADR-0017: REST over HTTP with command endpoints
 
-Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md) and [ADR-0038](0038-repeated-create-returns-stored-event.md)
+Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md), [ADR-0038](0038-repeated-create-returns-stored-event.md) and [ADR-0042](0042-writer-authentication.md)
 
 Date: 2026-11-19
 

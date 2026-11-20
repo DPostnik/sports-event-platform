@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md), [ADR-0037](adr/0037-refusals-of-well-formed-input.md), [ADR-0038](adr/0038-repeated-create-returns-stored-event.md), [ADR-0039](adr/0039-revalidation-and-weak-etags.md), [ADR-0040](adr/0040-time-limits-and-retry-after.md), [ADR-0041](adr/0041-time-window-bounds.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md) (superseded by ADR-0042), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md), [ADR-0037](adr/0037-refusals-of-well-formed-input.md), [ADR-0038](adr/0038-repeated-create-returns-stored-event.md), [ADR-0039](adr/0039-revalidation-and-weak-etags.md), [ADR-0040](adr/0040-time-limits-and-retry-after.md), [ADR-0041](adr/0041-time-window-bounds.md), [ADR-0042](adr/0042-writer-authentication.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -111,7 +111,7 @@ sequenceDiagram
     participant S as Source
     participant A as API
     participant D as Database
-    S->>A: create match (source, externalId)
+    S->>A: create match (bearer key, externalId)
     A->>D: begin transaction
     A->>D: insert event with (source, external_id)
     A->>D: insert event competitors
@@ -119,7 +119,7 @@ sequenceDiagram
     A-->>S: success with match ID
 ```
 
-1. The API receives a create request with `source` and `externalId`.
+1. The API receives a create request with a bearer key and `externalId`. It derives the source from the key.
 2. One database transaction persists the event with its `(source, external_id)` pair and its two competitor links.
 3. A repeated create with the same pair returns the stored event with status 200. A new event is answered with status 201. The data of a repeat is not compared, and a repeat never changes the event ([ADR-0038](adr/0038-repeated-create-returns-stored-event.md)).
 4. The same real match sent by another source becomes a second event. The service has no duplicate guard. Preventing duplicates belongs to reconciliation upstream ([ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md)).
@@ -164,7 +164,9 @@ Described, not built: a cache of a few seconds inside each instance for a shared
 
 ## API
 
-The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)).
+The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)). GET routes are public.
+POST routes require an opaque bearer key. A missing or invalid key returns 401 with a `WWW-Authenticate: Bearer` challenge.
+A command on another source's event returns 403 ([ADR-0042](adr/0042-writer-authentication.md)).
 
 | Action | Request |
 | ------ | ------- |
@@ -284,7 +286,7 @@ The ID strategy is defined in [ADR-0006](adr/0006-identifiers.md).
 - Sports are identified by their stable code.
 - In code only the event ID and the competitor ID are branded types. Other values are plain `string`, `number` and `Date` ([ADR-0033](adr/0033-branded-types-for-identifiers-only.md)).
 - Every event also stores the `source` that wrote it and that source's `external_id`. The pair is unique and makes create idempotent. See [ADR-0007](adr/0007-source-identity.md).
-- The rule that a source changes only its own events is not enforced, because the service does not authenticate callers. In production the source comes from the credentials of the caller and a command on an event of another source is refused as forbidden ([ADR-0028](adr/0028-source-ownership-needs-authentication.md)).
+- The service authenticates writes with opaque bearer keys. It takes the source from the configured key hash and returns 403 for commands on another source's events. GET routes are public. See [ADR-0042](adr/0042-writer-authentication.md).
 
 ## Change propagation
 
@@ -294,7 +296,7 @@ Consumers poll, and conditional requests make polling cheap. Publishing change e
 
 The design describes a platform. The implementation is one service. [ADR-0021](adr/0021-implementation-boundary.md) places every part in one of three categories: built, extension point, described.
 
-Not built, in short: provider adapters, reconciliation, the exact-duplicate guard, change events, match actions, load balancer and CDN, database replicas and failover, authentication and rate limiting. Without authentication any caller can change any event ([ADR-0028](adr/0028-source-ownership-needs-authentication.md)).
+Not built, in short: provider adapters, reconciliation, the exact-duplicate guard, change events, match actions, load balancer and CDN, database replicas and failover, and per-consumer rate limiting.
 
 ## Tooling
 
@@ -324,7 +326,7 @@ Not built, in short: provider adapters, reconciliation, the exact-duplicate guar
 | 11 | Closed by [ADR-0020](adr/0020-change-propagation.md). ~~How consumers learn about changes (polling only vs. published change events).~~ | It changes the load estimate and the write path. |
 | 12 | Closed by [ADR-0021](adr/0021-implementation-boundary.md). ~~Implementation boundary: which parts are code, which are extension points, which are described only.~~ | It sets the scope of the work. |
 | 13 | Closed by [ADR-0027](adr/0027-names-in-event-responses.md). ~~How a consumer gets the names of the sport and the competitors, and how that reference data is created.~~ | A consumer cannot show "Salzburg vs. Sturm" from IDs alone. |
-| 14 | Closed by [ADR-0028](adr/0028-source-ownership-needs-authentication.md). ~~Who may change an event: how the rule "a source changes only its own events" is enforced.~~ | Without authentication the rule of ADR-0007 is a convention, not a guarantee. |
+| 14 | Closed by [ADR-0042](adr/0042-writer-authentication.md). ~~Who may change an event: how the rule "a source changes only its own events" is enforced.~~ | A bearer key identifies the source. Commands require ownership. |
 | 15 | Closed by [ADR-0029](adr/0029-list-page-size-parameter.md). ~~How a consumer chooses the page size of the list, and what happens to the cache key.~~ | The maximum of ADR-0012 is unusable without a parameter, and the cache key must tell page sizes apart. |
 | 16 | Closed by [ADR-0030](adr/0030-domain-decides-commands.md). ~~Where the lifecycle rules run: in the conditional SQL statement, in the domain, or in both.~~ | Rules written twice can drift apart. |
 | 17 | Closed by [ADR-0031](adr/0031-phase-checked-at-run-time.md). ~~How the phase is typed in code when sports are data: a union per sport or a string with a run-time check.~~ | Types per sport made the domain hard to read without removing the run-time check. |

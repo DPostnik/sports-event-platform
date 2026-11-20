@@ -19,7 +19,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
       CONSTRAINT events_phase_only_when_live_check CHECK (phase IS NULL OR status = 'live'),
-      CONSTRAINT events_source_external_id_key UNIQUE (source, external_id)
+      CONSTRAINT events_source_external_id_key UNIQUE (source, external_id),
+      CONSTRAINT events_id_sport_code_key UNIQUE (id, sport_code)
     )
   `.execute(db);
 }

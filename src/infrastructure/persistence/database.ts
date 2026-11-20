@@ -31,6 +31,7 @@ interface EventsTable {
 interface EventCompetitorsTable {
   event_id: string;
   competitor_id: string;
+  sport_code: string;
   role: string;
 }
 

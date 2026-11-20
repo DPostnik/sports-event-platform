@@ -8,6 +8,7 @@ import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from
 
 const EVENT = "0198c5a0-7b1e-7d3a-9c4e-2f6a8b1d5e90";
 const UNKNOWN = "0198c5a0-ffff-7000-8000-00000000ffff";
+const KAC = "0198c5a0-0000-7000-8000-000000000003";
 
 let testDatabase: TestDatabase | undefined;
 let db: Kysely<Database>;
@@ -45,10 +46,15 @@ function insertEvent(changes: Partial<typeof VALID_EVENT> = {}): Promise<unknown
   `.execute(db);
 }
 
-function insertLink(competitorId: string, role: string, eventId = EVENT): Promise<unknown> {
+function insertLink(
+  competitorId: string,
+  role: string,
+  eventId = EVENT,
+  sportCode = "football",
+): Promise<unknown> {
   return sql`
-    INSERT INTO event_competitors (event_id, competitor_id, role)
-    VALUES (${eventId}, ${competitorId}, ${role})
+    INSERT INTO event_competitors (event_id, competitor_id, sport_code, role)
+    VALUES (${eventId}, ${competitorId}, ${sportCode}, ${role})
   `.execute(db);
 }
 
@@ -133,7 +139,7 @@ describe("Constraints of events (ADR-0002, ADR-0004, ADR-0007, ADR-0009, PER-2)"
   });
 });
 
-describe("Constraints of event competitors (ADR-0003, PER-2)", () => {
+describe("Constraints of event competitors (ADR-0003, ADR-0035, PER-2)", () => {
   beforeEach(async () => {
     await insertEvent();
     await insertLink(SALZBURG, "home");
@@ -152,10 +158,28 @@ describe("Constraints of event competitors (ADR-0003, PER-2)", () => {
   });
 
   it("refuses a competitor that does not exist", async () => {
-    await expectRefusedBy(insertLink(UNKNOWN, "away"), "event_competitors_competitor_id_fkey");
+    await expectRefusedBy(insertLink(UNKNOWN, "away"), "event_competitors_competitor_id_sport_code_fkey");
   });
 
   it("refuses a link to an event that does not exist", async () => {
-    await expectRefusedBy(insertLink(STURM, "away", UNKNOWN), "event_competitors_event_id_fkey");
+    await expectRefusedBy(insertLink(STURM, "away", UNKNOWN), "event_competitors_event_id_sport_code_fkey");
+  });
+
+  // ADR-0035: a link row has one sport. The event and the competitor must
+  // both have it, so each choice of the sport breaks one of the two keys.
+  it("refuses a competitor of another sport", async () => {
+    await sql`INSERT INTO sports (code, name) VALUES ('ice_hockey', 'Ice Hockey')`.execute(db);
+    await sql`
+      INSERT INTO competitors (id, sport_code, name) VALUES (${KAC}, 'ice_hockey', 'KAC')
+    `.execute(db);
+
+    await expectRefusedBy(
+      insertLink(KAC, "away", EVENT, "football"),
+      "event_competitors_competitor_id_sport_code_fkey",
+    );
+    await expectRefusedBy(
+      insertLink(KAC, "away", EVENT, "ice_hockey"),
+      "event_competitors_event_id_sport_code_fkey",
+    );
   });
 });

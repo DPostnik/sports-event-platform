@@ -117,8 +117,18 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
           await trx
             .insertInto("event_competitors")
             .values([
-              { event_id: event.id, competitor_id: event.homeCompetitorId, role: "home" },
-              { event_id: event.id, competitor_id: event.awayCompetitorId, role: "away" },
+              {
+                event_id: event.id,
+                competitor_id: event.homeCompetitorId,
+                sport_code: event.sport,
+                role: "home",
+              },
+              {
+                event_id: event.id,
+                competitor_id: event.awayCompetitorId,
+                sport_code: event.sport,
+                role: "away",
+              },
             ])
             .execute();
         }

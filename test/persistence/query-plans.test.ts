@@ -44,10 +44,11 @@ beforeAll(async () => {
     ORDER BY md5(i::text)
   `.execute(db);
   await sql`
-    INSERT INTO event_competitors (event_id, competitor_id, role)
+    INSERT INTO event_competitors (event_id, competitor_id, sport_code, role)
     SELECT md5('e-' || i)::uuid,
            md5('c-' || (ARRAY['football', 'ice_hockey', 'handball', 'basketball'])[i % 4 + 1]
                || '-' || (i / 4 + side.shift) % 500)::uuid,
+           (ARRAY['football', 'ice_hockey', 'handball', 'basketball'])[i % 4 + 1],
            side.role
     FROM generate_series(0, 49999) AS i
     CROSS JOIN (VALUES ('home', 0), ('away', 1)) AS side (role, shift)

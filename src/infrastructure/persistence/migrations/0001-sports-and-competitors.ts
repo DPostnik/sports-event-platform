@@ -15,7 +15,8 @@ export async function up(db: Kysely<unknown>): Promise<void> {
       id uuid PRIMARY KEY,
       sport_code text NOT NULL REFERENCES sports (code),
       name text NOT NULL
-        CONSTRAINT competitors_name_check CHECK (length(name) > 0)
+        CONSTRAINT competitors_name_check CHECK (length(name) > 0),
+      CONSTRAINT competitors_id_sport_code_key UNIQUE (id, sport_code)
     )
   `.execute(db);
 }

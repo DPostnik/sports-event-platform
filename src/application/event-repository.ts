@@ -43,6 +43,8 @@ export interface EventRepository {
 
   findById(id: EventId): Promise<EventView | undefined>;
 
+  findBySourceIdentity(source: string, externalId: string): Promise<EventView | undefined>;
+
   // ADR-0030: writes an event that the domain changed, only when the stored
   // version still equals `expectedVersion`. False means that nothing was
   // written: another writer was faster, or the event does not exist.

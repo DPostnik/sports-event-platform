@@ -36,6 +36,10 @@ function selectEventRows(db: Kysely<Database>) {
     ]);
 }
 
+function selectBySourceIdentity(db: Kysely<Database>, source: string, externalId: string) {
+  return selectEventRows(db).where("e.source", "=", source).where("e.external_id", "=", externalId);
+}
+
 // The two read statements are exported so the query plan tests run EXPLAIN on
 // the statements the repository runs (ADR-0013).
 export function buildFindByIdQuery(db: Kysely<Database>, id: EventId) {
@@ -134,9 +138,7 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
         }
 
         // Read the stored event: the new one, or the one that already existed.
-        const row = await selectEventRows(trx)
-          .where("e.source", "=", event.source)
-          .where("e.external_id", "=", event.externalId)
+        const row = await selectBySourceIdentity(trx, event.source, event.externalId)
           .executeTakeFirstOrThrow();
         return { view: toEventView(row), created: inserted !== undefined };
       });
@@ -144,6 +146,11 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
 
     async findById(id) {
       const row = await buildFindByIdQuery(db, id).executeTakeFirst();
+      return row === undefined ? undefined : toEventView(row);
+    },
+
+    async findBySourceIdentity(source, externalId) {
+      const row = await selectBySourceIdentity(db, source, externalId).executeTakeFirst();
       return row === undefined ? undefined : toEventView(row);
     },
 

@@ -54,7 +54,7 @@ Project files are imported by the full path from the project root: `#src/...` an
 
 - Schema changes are migrations. Constraints and indexes are explicit SQL with a name. The reasons are in the ADRs and the README, not in comments.
 - A change to an existing event is read, decided by the domain, and written by one statement that is conditional on the version (ADR-0009, ADR-0030). The SQL does not repeat lifecycle rules.
-- Each use case that writes runs in one explicit transaction.
+- A write of more than one statement runs in one explicit transaction. A write of one statement is atomic by itself and needs none. A command that gains a second statement gets a transaction with it.
 - Rows are checked in the mapper with the domain constructors before they become domain objects (ADR-0034). No Zod in the persistence layer.
 
 ## Tests

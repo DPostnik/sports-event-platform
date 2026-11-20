@@ -9,7 +9,6 @@ Order of cuts when time runs short is fixed in [ADR-0021](adr/0021-implementatio
 - `package.json`, Node.js version pin, strict `tsconfig`, ESM.
 - Linter with the layer import rules of `AGENTS.md`.
 - Vitest with three projects: domain, persistence, API.
-- Docker Compose with PostgreSQL and Redis.
 
 Done when: `typecheck` and `lint` pass; a deliberate forbidden import fails the linter. Layer folders and tests arrive with the first code of each layer.
 
@@ -30,6 +29,7 @@ Done when: `test:domain` passes without Docker and the domain imports nothing ou
 - Kysely schema types and the row-to-domain mapper with domain checks (ADR-0034).
 - Repository: idempotent create (ADR-0007), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012).
 - Seed data: two sports, four competitors, the two example events of the brief.
+- Docker Compose with PostgreSQL for the migrate and seed commands.
 - Tests: each constraint rejects bad data; concurrent writers; concurrent creates; cursor stability; query plans on a populated database.
 
 Done when: `test:persistence` passes against a real PostgreSQL.
@@ -47,7 +47,7 @@ Done when: `test:api` passes and the two example events of the brief can be crea
 
 ## Step 5 - Cache and failure behaviour
 
-- Cache port, Redis and in-memory implementations (ADR-0015).
+- Cache port, Redis and in-memory implementations (ADR-0015). Redis joins Docker Compose.
 - Read-through for one event and for list pages; delete on write; 60-second expiry (ADR-0014).
 - `Cache-Control`, `ETag`, `Age`, conditional requests (ADR-0019).
 - In-flight read sharing and the connection pool cap (ADR-0016).

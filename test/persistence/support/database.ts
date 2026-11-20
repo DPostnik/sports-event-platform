@@ -6,6 +6,7 @@ import { migrateToLatest } from "#src/infrastructure/persistence/migrate.ts";
 
 export interface TestDatabase {
   readonly db: Kysely<Database>;
+  readonly connectionString: string;
   stop(): Promise<void>;
 }
 
@@ -13,11 +14,13 @@ export interface TestDatabase {
 // migrations applied to the empty database.
 export async function startTestDatabase(): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer("postgres:17").start();
-  const db = createDatabase(container.getConnectionUri());
+  const connectionString = container.getConnectionUri();
+  const db = createDatabase(connectionString);
   await migrateToLatest(db);
 
   return {
     db,
+    connectionString,
     async stop() {
       await db.destroy();
       await container.stop();

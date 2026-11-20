@@ -50,6 +50,8 @@ interface AppOptions {
   readonly logger?: boolean;
 }
 
+const freshSeconds = 60;
+const retentionSeconds = 3600;
 const healthResponse = z.strictObject({ status: z.literal("ok") });
 function matchesIfNoneMatch(header: string | undefined, opaqueTag: string): boolean {
   if (!header) return false;
@@ -111,13 +113,25 @@ export async function buildApp(options: AppOptions) {
     return { generatedAt: clock.now().toISOString(), event: toEventResponse(view) };
   }
 
+  function ageInSeconds(generatedAt: string) {
+    return Math.floor((clock.now().getTime() - Date.parse(generatedAt)) / 1000);
+  }
+
+  function staleAfterFailure<T extends { generatedAt: string }>(error: unknown, cached: T | undefined) {
+    if (!cached || databaseFailure(error) !== "UNAVAILABLE") throw error;
+    // The entry may reach its retention limit while the database request is waiting.
+    const age = ageInSeconds(cached.generatedAt);
+    if (age < 0 || age >= retentionSeconds) throw error;
+    return { body: cached, age };
+  }
+
   async function readCached<T extends { generatedAt: string }>(key: string, schema: z.ZodType<T>, request: FastifyRequest) {
     try {
       const raw = await cache?.get(key);
       if (raw === undefined) return undefined;
       const body = schema.parse(JSON.parse(raw));
-      const age = Math.floor((clock.now().getTime() - Date.parse(body.generatedAt)) / 1000);
-      return age >= 0 && age < 60 ? { body, age } : undefined;
+      const age = ageInSeconds(body.generatedAt);
+      return age >= 0 && age < retentionSeconds ? { body, age } : undefined;
     } catch (err) {
       request.log.warn({ err }, "Failed to read cached response");
       return undefined;
@@ -125,7 +139,7 @@ export async function buildApp(options: AppOptions) {
   }
 
   async function cacheResponse(key: string, body: unknown, request: FastifyRequest) {
-    await cache?.set(key, JSON.stringify(body), 3600).catch((err: unknown) => {
+    await cache?.set(key, JSON.stringify(body), retentionSeconds).catch((err: unknown) => {
       request.log.warn({ err }, "Failed to cache response");
     });
   }
@@ -157,16 +171,21 @@ export async function buildApp(options: AppOptions) {
     const id = request.params.id;
     const key = `event:${id}`;
     let entry = await readCached(key, eventResponse, request);
-    if (entry?.body.event.id !== id) {
-      const loaded = await eventReads.run(key, async () => {
-        const result = await events.get(id);
-        if (!result.ok) return result;
-        const body = singleEvent(result.value);
-        await cacheResponse(key, body, request);
-        return ok(body);
-      });
-      if (!loaded.ok) return sendProblem(reply, eventProblem(loaded.error));
-      entry = { body: loaded.value, age: 0 };
+    if (entry?.body.event.id !== id) entry = undefined;
+    if (!entry || entry.age >= freshSeconds) {
+      try {
+        const loaded = await eventReads.run(key, async () => {
+          const result = await events.get(id);
+          if (!result.ok) return result;
+          const body = singleEvent(result.value);
+          await cacheResponse(key, body, request);
+          return ok(body);
+        });
+        if (!loaded.ok) return await sendProblem(reply, eventProblem(loaded.error));
+        entry = { body: loaded.value, age: 0 };
+      } catch (err) {
+        entry = staleAfterFailure(err, entry?.body);
+      }
     }
     const opaqueTag = `"${String(entry.body.event.version)}"`;
     reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "no-cache").header("Age", String(entry.age));
@@ -187,18 +206,22 @@ export async function buildApp(options: AppOptions) {
     const { sport, status, from, to, competitor, cursor, limit = 50 } = request.query;
     const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
     let entry = await readCached(key, listResponse, request);
-    if (!entry) {
-      const body = await pageReads.run(key, async () => {
-        const page = await events.list(toEventFilters(request.query), cursor, limit);
-        const response = {
-          generatedAt: clock.now().toISOString(),
-          events: page.views.map(toEventResponse),
-          nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
-        };
-        await cacheResponse(key, response, request);
-        return response;
-      });
-      entry = { body, age: 0 };
+    if (!entry || entry.age >= freshSeconds) {
+      try {
+        const body = await pageReads.run(key, async () => {
+          const page = await events.list(toEventFilters(request.query), cursor, limit);
+          const response = {
+            generatedAt: clock.now().toISOString(),
+            events: page.views.map(toEventResponse),
+            nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
+          };
+          await cacheResponse(key, response, request);
+          return response;
+        });
+        entry = { body, age: 0 };
+      } catch (err) {
+        entry = staleAfterFailure(err, entry?.body);
+      }
     }
     const { events: items, nextCursor } = entry.body;
     const versions = items.map(({ id, version }) => [id, version]);

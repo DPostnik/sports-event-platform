@@ -8,5 +8,9 @@ export function createDatabase(
   limits?: Pick<pg.PoolConfig, "max" | "connectionTimeoutMillis" | "statement_timeout">,
 ): Kysely<Database> {
   const pool = new pg.Pool({ connectionString, ...limits });
+  // pg removes broken idle connections. Its unhandled error event would stop the API.
+  pool.on("error", (error: Error) => {
+    console.warn("Idle PostgreSQL connection failed:", error.message);
+  });
   return new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
 }

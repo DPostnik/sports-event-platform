@@ -38,7 +38,9 @@ describe("Concurrent reads without a shared cache (ADR-0016)", () => {
     const waiting: Array<() => void> = [];
     app.addHook("onRequest", (_request, _reply, done) => {
       waiting.push(done);
-      if (waiting.length === urls.length) waiting.forEach((resume) => resume());
+      if (waiting.length === urls.length) {
+        for (const resume of waiting) resume();
+      }
     });
     const responses = await Promise.all(urls.map((url) => app.inject(url)));
     for (const response of responses) {

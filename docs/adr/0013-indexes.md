@@ -1,6 +1,6 @@
 # ADR-0013: One index per named query
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0032](0032-duplicate-guard-not-built.md)
 
 Date: 2026-11-19
 

@@ -1,6 +1,6 @@
 # ADR-0018: One error format with stable error codes
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0032](0032-duplicate-guard-not-built.md)
 
 Date: 2026-11-19
 

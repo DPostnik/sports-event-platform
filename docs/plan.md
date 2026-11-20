@@ -29,7 +29,7 @@ Done when: `test:domain` passes without Docker and the domain imports nothing ou
 
 - Migrations: `sports`, `competitors`, `events`, `event_competitors`, constraints and the indexes of ADR-0013.
 - Kysely schema types and the row-to-domain mapper with validation.
-- Repository: idempotent create (ADR-0007), exact-duplicate guard (ADR-0008), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012).
+- Repository: idempotent create (ADR-0007), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012).
 - Seed data: two sports, four competitors, the two example events of the brief.
 - Tests: each constraint rejects bad data; concurrent writers; concurrent creates; cursor stability; query plans on a populated database.
 

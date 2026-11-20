@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -93,7 +93,7 @@ sequenceDiagram
 1. The API receives a create request with `source` and `externalId`.
 2. One database transaction persists the event with its `(source, external_id)` pair and its two competitor links.
 3. A repeated create with the same pair returns the stored event.
-4. Before the commit, the database rejects an exact duplicate: same sport, competitors and start instant from another source. The API answers with a conflict naming the existing event. This is an interim guard, see [ADR-0008](adr/0008-ingestion-boundary.md).
+4. The same real match sent by another source becomes a second event. The service has no duplicate guard. Preventing duplicates belongs to reconciliation upstream ([ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md)).
 5. The API returns success after the commit.
 
 ### Write commands
@@ -258,7 +258,7 @@ Consumers poll, and conditional requests make polling cheap. Publishing change e
 
 The design describes a platform. The implementation is one service. [ADR-0021](adr/0021-implementation-boundary.md) places every part in one of three categories: built, extension point, described.
 
-Not built, in short: provider adapters, reconciliation, change events, match actions, load balancer and CDN, database replicas and failover, authentication and rate limiting. Without authentication any caller can change any event ([ADR-0028](adr/0028-source-ownership-needs-authentication.md)).
+Not built, in short: provider adapters, reconciliation, the exact-duplicate guard, change events, match actions, load balancer and CDN, database replicas and failover, authentication and rate limiting. Without authentication any caller can change any event ([ADR-0028](adr/0028-source-ownership-needs-authentication.md)).
 
 ## Tooling
 
@@ -292,5 +292,6 @@ Not built, in short: provider adapters, reconciliation, change events, match act
 | 15 | Closed by [ADR-0029](adr/0029-list-page-size-parameter.md). ~~How a consumer chooses the page size of the list, and what happens to the cache key.~~ | The maximum of ADR-0012 is unusable without a parameter, and the cache key must tell page sizes apart. |
 | 16 | Closed by [ADR-0030](adr/0030-domain-decides-commands.md). ~~Where the lifecycle rules run: in the conditional SQL statement, in the domain, or in both.~~ | Rules written twice can drift apart. |
 | 17 | Closed by [ADR-0031](adr/0031-phase-checked-at-run-time.md). ~~How the phase is typed in code when sports are data: a union per sport or a string with a run-time check.~~ | Types per sport made the domain hard to read without removing the run-time check. |
+| 18 | Closed by [ADR-0032](adr/0032-duplicate-guard-not-built.md). ~~Whether the interim exact-duplicate guard is worth its cost in the schema and in the create path.~~ | It added a column, an index, a second conflict and a race, and caught exact copies only. |
 
 Each question was closed by its own commit that added a decision record under `docs/adr/` and updated this document. New questions found during implementation are added here and closed the same way.

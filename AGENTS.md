@@ -17,7 +17,7 @@ src/
   application/     use cases and ports (interfaces for repository, cache, clock, ID generator)
   infrastructure/
     persistence/   Kysely, migrations, row-to-domain mapper
-    cache/         Redis and in-memory implementations of the cache port
+    cache/         Redis, in-memory and fallback implementations of the cache port
   http/            Fastify routes, Zod schemas, error mapping
   config/          environment configuration
   main.ts          composition root: the only place that wires implementations to ports

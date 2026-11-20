@@ -1,4 +1,6 @@
 import { createClient } from "@redis/client";
+import { createFallbackCache } from "#src/infrastructure/cache/fallback-cache.ts";
+import { createInMemoryCache } from "#src/infrastructure/cache/in-memory-cache.ts";
 import { createRedisCache } from "#src/infrastructure/cache/redis-cache.ts";
 import { sql } from "kysely";
 import { v7 } from "uuid";
@@ -9,6 +11,10 @@ import { buildApp } from "#src/http/app.ts";
 import { databaseFailure } from "#src/infrastructure/persistence/database-failure.ts";
 import { createDatabase } from "#src/infrastructure/persistence/connection.ts";
 import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
+
+// Local fallback cache limits (ADR-0043): 5 seconds of life, 1,000 entries.
+const LOCAL_CACHE_TTL_SECONDS = 5;
+const LOCAL_CACHE_MAX_ENTRIES = 1000;
 
 export async function buildService(config: Configuration, logger = true) {
   const db = createDatabase(config.databaseUrl, {
@@ -35,12 +41,24 @@ export async function buildService(config: Configuration, logger = true) {
           disableOfflineQueue: true,
           commandOptions: { timeout: 200 },
         });
+  const clock = { now: () => new Date() };
+  // The app logger exists only after buildApp, which needs the cache first.
+  let reportCacheFailure: (error: unknown) => void = () => {};
   try {
     const app = await buildApp({
       events,
       writerKeys: config.writerKeys,
-      cache: redis && createRedisCache(redis),
-      clock: { now: () => new Date() },
+      cache:
+        redis &&
+        createFallbackCache(
+          createRedisCache(redis),
+          createInMemoryCache(clock, LOCAL_CACHE_MAX_ENTRIES),
+          LOCAL_CACHE_TTL_SECONDS,
+          (error) => {
+            reportCacheFailure(error);
+          },
+        ),
+      clock,
       checkReadiness: async () => {
         await sql`SELECT 1`.execute(db);
       },
@@ -48,6 +66,9 @@ export async function buildService(config: Configuration, logger = true) {
       retryAfterSeconds: config.retryAfterSeconds,
       logger,
     });
+    reportCacheFailure = (err) => {
+      app.log.warn({ err }, "Shared cache failed, using the local cache");
+    };
     if (redis) {
       redis.on("error", (err: Error) => {
         app.log.warn({ err }, "Redis connection failed");

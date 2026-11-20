@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+
+# Local working material, never committed
+brief/
+notes/

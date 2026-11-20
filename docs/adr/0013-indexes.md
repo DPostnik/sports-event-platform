@@ -35,8 +35,8 @@ Each query gets one index. There is no index without a named query.
 
 ## Consequences
 
-- The `events` table has six indexes. One insert writes seven entries instead of one. At the peak of 100 writes per second this is small.
-- A reschedule changes `start_time` and updates three list indexes. A status change updates one.
+- The `events` table has six indexes: the primary key, the source key, the `(id, sport_code)` key of [ADR-0035](0035-same-sport-enforced-by-schema.md) and the three list indexes. One new event writes one row and six index entries in `events`, and two rows and six index entries in `event_competitors`. At the peak of 100 writes per second this is small.
+- A reschedule or a status change writes a new version of the row and a new entry in each of the six indexes, not only in the indexes that hold the changed column. PostgreSQL skips the index writes only when no indexed column changes.
 - The combination "sport and status" has no index of its own. The database uses one of the two indexes and filters the rest. For live events of one sport this is tens of rows. Known compromise.
 - The competitor filter orders by a column of another table and needs a join. One competitor has hundreds of events, not millions. Known compromise.
 - This table is a design claim until measured. The implementation must check the query plans on a populated database: each query in the table must use its index.

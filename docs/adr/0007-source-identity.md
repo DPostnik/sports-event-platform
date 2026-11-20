@@ -30,11 +30,11 @@ Data providers already have their own ID for each match. They cannot be expected
 
 - Keep `(sourceId, requestId)`. Rejected: it does not stop the same match arriving in a new request.
 - Require sources to store and send the service ID. Rejected: it pushes this service's identity into every provider.
-- Let several sources update one event. Rejected: their updates would overwrite each other, and their version numbers are not comparable. Deciding between sources is reconciliation, see open question 12.
+- Let several sources update one event. Rejected: their updates would overwrite each other, and their version numbers are not comparable. Deciding between sources is reconciliation, see [ADR-0008](0008-ingestion-boundary.md).
 
 ## Consequences
 
 - One unique constraint replaces a mapping table.
 - A source addresses its event by `(source, external_id)`. A consumer addresses it by the service ID.
 - The same real match sent by two sources becomes two events unless something upstream prevents it. This is not solved here.
-- How a source's own out-of-order or repeated updates are handled belongs to open question 6.
+- How a source's own out-of-order or repeated updates are handled is decided in [ADR-0009](0009-optimistic-concurrency.md).

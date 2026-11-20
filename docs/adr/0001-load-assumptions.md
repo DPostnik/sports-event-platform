@@ -1,6 +1,6 @@
 # ADR-0001: Load and data volume assumptions
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0014](0014-cache-freshness.md)
 
 Date: 2026-11-19
 
@@ -39,4 +39,4 @@ Values marked as estimates are the author's assumptions, not Sportradar data. Re
 - Reads exceed writes by more than 1,000 to 1 on average. This justifies a read cache and, later, read replicas.
 - Writes are rare, so conflicts will be rare. This favors optimistic concurrency control.
 - A 60-second list TTL fits the accepted staleness.
-- At peak, 12,000 requests per second with a 90% cache hit rate leaves 1,200 database reads per second. At the v1 assumption of 100 ms per read, that is about 120 reads in flight. This exceeds a small connection pool. The cache decision (open question 8) must address this with a higher hit rate, faster indexed reads, or replicas.
+- At peak, 12,000 requests per second with a 90% cache hit rate leaves 1,200 database reads per second. Design v1 assumed 100 ms per read. That gives about 120 reads in flight and exceeds a small connection pool. The figure is too high. An indexed read of one event or of one list page takes 1 to 2 ms in the database. This is a best case: 50,000 events, one connection, all data in memory, a development machine. The sizing uses 10 ms per read, to allow for the network, data that is not in memory and concurrent load. At 10 ms, 1,200 reads per second keep about 12 connections busy. The remaining risks are a low hit rate and a cache outage. [ADR-0014](0014-cache-freshness.md) and [ADR-0016](0016-failure-modes.md) handle them.

@@ -73,7 +73,7 @@ There are two read operations ([ADR-0011](adr/0011-read-queries.md)): one event 
 2. The API checks the shared cache first.
 3. On a miss, the API reads from the database and populates the cache.
 4. The list cache key contains the filters, the cursor and the limit.
-5. A list page expires after 60 seconds. One event is deleted from the cache when it changes, with a 60-second expiry as a safety net ([ADR-0014](adr/0014-cache-freshness.md)).
+5. A list page is fresh for 60 seconds. One event is deleted from the cache when it changes, and is fresh for at most 60 seconds as a safety net ([ADR-0014](adr/0014-cache-freshness.md)). An entry older than 60 seconds stays in the cache for up to 1 hour and is served only while the database is down ([ADR-0016](adr/0016-failure-modes.md)).
 
 ### Create
 
@@ -166,14 +166,14 @@ Average case:
 
 - 24,000 viewers poll every 10 seconds. That is 2,400 requests per second on average.
 - A 90% cache hit rate leaves 240 database reads per second.
-- At 100 ms per read, about 24 reads are in flight on average, if the database keeps up.
+- At 10 ms per read, two to three reads are in flight on average. The 10 ms is a cautious figure for sizing. The measured best case is 1 to 2 ms in the database: 50,000 events, one connection, all data in memory, a development machine.
 - Connection-pool wait time and actual completions are separate measurements.
 
 Peak case:
 
 - 12,000 requests per second with a 90% cache hit rate leaves 1,200 database reads per second.
-- At 100 ms per read, about 120 reads are in flight.
-- This exceeds a small connection pool. Open question 8 must address it.
+- At 10 ms per read, about 12 reads are in flight. A small connection pool covers this.
+- During a cache outage all 12,000 requests per second reach the database. At 10 ms that is about 120 reads in flight, more than the pool. [ADR-0016](adr/0016-failure-modes.md) caps the pool and refuses the excess.
 
 ## Entities
 

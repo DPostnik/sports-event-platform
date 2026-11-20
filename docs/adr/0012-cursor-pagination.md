@@ -33,7 +33,7 @@ This replaces the page number of design v1.
 
 ## Consequences
 
-- Every list request reads at most one page of rows from an index, however deep the consumer is in the list. Load per request is predictable at the peak rate of [ADR-0001](0001-load-assumptions.md).
+- A list request that has its own index in [ADR-0013](0013-indexes.md) reads one page of rows from that index, however deep the consumer is in the list. Two requests read more. Sport with status reads the rows of one index and drops the rows that fail the other filter. The competitor filter reads all events of the competitor and sorts them. Both are known compromises of [ADR-0013](0013-indexes.md).
 - Events created or cancelled during paging do not cause duplicates or gaps for events that still match.
 - An index cannot answer "the row 250 positions after this one" without walking those rows. It stores values in order, not row numbers. This is why a jump by page count is not free, with or without a cursor.
 - Consumers cannot show "page 3 of 60" or jump to an arbitrary page. Known limitation, acceptable for schedule screens.

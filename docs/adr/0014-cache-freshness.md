@@ -1,6 +1,6 @@
 # ADR-0014: Cache freshness - delete on write for one event, expiry for lists
 
-Status: Accepted, amended by [ADR-0029](0029-list-page-size-parameter.md)
+Status: Accepted, amended by [ADR-0016](0016-failure-modes.md) and [ADR-0029](0029-list-page-size-parameter.md)
 
 Date: 2026-11-19
 
@@ -45,5 +45,5 @@ This changes one value of [ADR-0001](0001-load-assumptions.md): acceptable stale
 - No answer is stale for more than 60 seconds while the database is up. [ADR-0016](0016-failure-modes.md) later allows marked older data during a database outage.
 - Database read load depends on the number of distinct cache keys in use, not on the request rate. Each key is loaded about once per 60 seconds. This answers the peak concern of [ADR-0001](0001-load-assumptions.md): more viewers of the same data do not add database reads.
 - Many distinct keys do add reads. Consumers that use many different time windows or cursors lower the hit rate. Not measured yet.
-- After an expiry, many requests for one key can arrive together. This is handled by the failure-mode decision (open question 8).
-- Where the cache runs, and what happens when it or the database is down, is still open (open question 8).
+- After an expiry, many requests for one key can arrive together. [ADR-0016](0016-failure-modes.md) handles this.
+- Where the cache runs is decided in [ADR-0015](0015-shared-cache.md). What happens when it or the database is down is decided in [ADR-0016](0016-failure-modes.md).

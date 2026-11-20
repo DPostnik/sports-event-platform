@@ -2,7 +2,7 @@
 
 The service tracks match schedules and live status. It stores events in PostgreSQL and caches reads in Redis. A writer creates an event and moves it through its lifecycle with six named commands. A reader gets one event or a filtered, paged list.
 
-This repository holds one TypeScript service, its tests, and the written design: a system description, 42 decision records (ADRs) and the requirements. The README summarizes them and links to the ADR for each decision. Where it says "built", the code and a test exist. Where it says "described", the design is written down and no code exists.
+This repository holds one TypeScript service, its tests, and the written design: a system description, 43 decision records (ADRs) and the requirements. The README summarizes them and links to the ADR for each decision. Where it says "built", the code and a test exist. Where it says "described", the design is written down and no code exists.
 
 Contents:
 
@@ -119,7 +119,7 @@ flowchart LR
 src/
   domain/          pure TypeScript: types, lifecycle, commands, typed errors
   application/     use cases and ports (repository, cache, clock, ID generator)
-  infrastructure/  persistence (Kysely, migrations, mapper) and cache (Redis, in-memory)
+  infrastructure/  persistence (Kysely, migrations, mapper) and cache (Redis, in-memory, fallback)
   http/            Fastify routes, Zod schemas, error mapping
   config/          environment configuration
   main.ts          composition root: the only place that wires implementations to ports
@@ -133,7 +133,7 @@ src/
 | `http` | `application`, `domain` |
 | `main.ts` | everything |
 
-`infrastructure` and `http` never import each other. ESLint enforces these rules, and a forbidden import fails `npm run lint`. Files are imported by full path (`#src/...`, `#test/...`), never relatively. The cache is a port with a Redis adapter ([ADR-0015](docs/adr/0015-shared-cache.md)). An in-memory adapter exists, but the composition root wires only Redis, and no test uses the in-memory one.
+`infrastructure` and `http` never import each other. ESLint enforces these rules, and a forbidden import fails `npm run lint`. Files are imported by full path (`#src/...`, `#test/...`), never relatively. The cache is a port with a Redis adapter ([ADR-0015](docs/adr/0015-shared-cache.md)). Redis is the primary adapter. The in-memory adapter is the local fallback: the composition root wraps both in one adapter that uses the in-memory cache only while Redis fails ([ADR-0043](docs/adr/0043-local-fallback-cache.md)).
 
 ### Create flow
 
@@ -169,7 +169,7 @@ sequenceDiagram
     A-->>C: response with Cache-Control, ETag, Age
 ```
 
-A cache error never fails a request: the read goes to the database. Details are in [Behaviour under load and failure](#behaviour-under-load-and-failure).
+A cache error never fails a request. When Redis fails, the local cache of the instance answers a repeated read for up to 5 seconds, and any other read goes to the database. Details are in [Behaviour under load and failure](#behaviour-under-load-and-failure).
 
 ## Domain model
 
@@ -445,7 +445,7 @@ These figures are the author's estimates, not provider data. Real traffic is not
 | Read rate | 2,400 requests per second on average, 10,000 to 12,000 at peak |
 | Acceptable staleness | lists up to 60 seconds. One event: none in the normal case, up to 60 seconds after a lost cache delete ([ADR-0014](docs/adr/0014-cache-freshness.md)) |
 
-Reads exceed writes by more than 1,000 to 1. With a 90% cache hit rate, the peak leaves about 1,200 database reads per second. At a cautious 10 ms per read, about 12 reads are in flight. The measured best case is 1 to 2 ms in the database, on 50,000 events, one connection, all data in memory and a development machine. During a cache outage all 12,000 requests per second reach the database, about 120 in flight, which is more than a small pool. That case is the reason for the pool cap and the refusals below.
+Reads exceed writes by more than 1,000 to 1. With a 90% cache hit rate, the peak leaves about 1,200 database reads per second. At a cautious 10 ms per read, about 12 reads are in flight. The measured best case is 1 to 2 ms in the database, on 50,000 events, one connection, all data in memory and a development machine. Without a local cache, a cache outage would send all 12,000 requests per second to the database, about 120 in flight, which is more than a small pool. That case is the reason for the pool cap and the refusals below. The local cache of [ADR-0043](docs/adr/0043-local-fallback-cache.md) lowers that load to at most one read per key, per instance, per 5 seconds, for the 1,000 keys it holds. The pool cap stays as the last protection.
 
 ### Scalability topics
 
@@ -453,7 +453,7 @@ Reads exceed writes by more than 1,000 to 1. With a 90% cache hit rate, the peak
 | ----- | ------ | --- |
 | Stateless instances, horizontal scaling | Design property, partly tested | The service keeps no state between requests. Per-instance state (the in-flight map and the pool) lives only for requests. One test runs two instances against one Redis and checks that a command's cache delete reaches the other instance. No load balancer or multi-instance deployment is built |
 | HTTP caching, ETags | Built | `Cache-Control`, weak `ETag`, `Age`, 304 ([ADR-0019](docs/adr/0019-response-shape.md), [ADR-0039](docs/adr/0039-revalidation-and-weak-etags.md)) |
-| Shared cache | Built | Redis, delete on write for one event, 60-second expiry for lists ([ADR-0014](docs/adr/0014-cache-freshness.md), [ADR-0015](docs/adr/0015-shared-cache.md)) |
+| Shared cache | Built | Redis, delete on write for one event, 60-second expiry for lists. A 5-second local cache answers while Redis is down ([ADR-0014](docs/adr/0014-cache-freshness.md), [ADR-0015](docs/adr/0015-shared-cache.md), [ADR-0043](docs/adr/0043-local-fallback-cache.md)) |
 | CDN, read replicas | Described | A CDN may hold list pages for 60 seconds. Replicas take list reads when the primary is the limit ([ADR-0001](docs/adr/0001-load-assumptions.md)) |
 | Index use, keyset pagination | Built | One index per query, cursor on `(start_time, id)`, a page limit of 100 ([ADR-0013](docs/adr/0013-indexes.md), [ADR-0012](docs/adr/0012-cursor-pagination.md)) |
 | Partitioning or archiving by date | Described | 5 million rows need no partitioning. It is a future option ([ADR-0001](docs/adr/0001-load-assumptions.md)) |
@@ -469,11 +469,10 @@ The service shuts down gracefully on SIGINT and SIGTERM: Fastify closes, then th
 | Failure | Behaviour | Status |
 | ------- | --------- | ------ |
 | A popular cache entry expires | Concurrent requests for one key inside an instance share one in-flight database read. With ten instances, up to ten reads reach the database | Built, tested |
-| The cache is down | A cache error never fails a request. Reads go to the database, capped by the pool. Writes continue. A lost delete is bounded by the 60-second freshness limit. Redis commands time out after 200 ms and are not queued while the client is offline | Built, tested |
+| The cache is down | A cache error never fails a request. A local cache inside each instance answers repeated reads for up to 5 seconds ([ADR-0043](docs/adr/0043-local-fallback-cache.md)). Other reads go to the database, capped by the pool. Writes continue. A lost delete is bounded by the 60-second freshness limit. Redis commands time out after 200 ms and are not queued while the client is offline | Built, tested |
 | The pool is busy | A request that waits more than 200 ms for a connection gets 503 `OVERLOADED`, `Retry-After` 1 | Built, tested |
 | The database is slow | A statement over 1 second is cancelled by PostgreSQL and handled as "database down" for that request | Built, tested |
 | The database is down | Entries up to 1 hour old are served, with the age in `generatedAt` and `Age`. A read without an entry and every write gets 503 `UNAVAILABLE`, `Retry-After` 5 | Built, tested |
-| Shared cache down, many instances | A few-seconds cache inside each instance would absorb repeated reads | Described |
 | Primary database lost | A standby with automatic failover. The cache serves reads during the switch | Described |
 
 A cache entry has two ages. It is fresh for 60 seconds. It is kept for 1 hour, and served after the 60 seconds only while the database is down ([ADR-0016](docs/adr/0016-failure-modes.md)). During a database outage a cancelled event can still be served as scheduled, with its old age visible. The pool size, the waits and the `Retry-After` values are starting estimates. No load test exists in this repository, and they are not tuned by measurement.
@@ -485,7 +484,7 @@ Tests sit in three folders, one per level. Each level has its own command ([ADR-
 | Level | Folder | Checks | Why it exists |
 | ----- | ------ | ------ | ------------- |
 | Domain | `test/domain/` | Invariants, lifecycle, commands, typed errors, type-level rules, use cases against fake ports | Fast, no Docker. The default while writing code |
-| Persistence | `test/persistence/` | Constraints, mapper, repository, conditional write, concurrent writers and creates, query plans, Redis cache, seed | Constraints, indexes and transactions are part of what is tested. A substitute would not run them |
+| Persistence | `test/persistence/` | Constraints, mapper, repository, conditional write, concurrent writers and creates, query plans, Redis cache, in-memory and fallback cache adapters (no Docker needed for these two), seed | Constraints, indexes and transactions are part of what is tested. A substitute would not run them |
 | API | `test/api/` | Routes, errors, headers, authentication, OpenAPI conformance, cache across instances, Redis and PostgreSQL outages, time limits | The real path from HTTP to the database |
 
 Persistence and API tests start real PostgreSQL and Redis containers with Testcontainers. A reviewer without Docker can still run the domain level.
@@ -495,7 +494,7 @@ Persistence and API tests start real PostgreSQL and Redis containers with Testco
 | Property-based (fast-check) | For any sequence of commands: a terminal status never changes, the version rises by one per applied command and never otherwise, a refused command changes nothing |
 | Type-level | `@ts-expect-error` lines in `event.test.ts` and `ids.test.ts`, checked by `npm run typecheck` |
 | Concurrency | Two writers with one `expectedVersion`: exactly one wins. Two creates of one source identity: one event. Many identical reads: one database read |
-| Failure mode | Redis stopped, PostgreSQL stopped (cached reads, refused writes), statement timeout versus pool wait, `Retry-After` on every 503 |
+| Failure mode | Redis stopped (a repeated read is answered locally for 5 seconds), PostgreSQL stopped (cached reads, refused writes), statement timeout versus pool wait, `Retry-After` on every 503 |
 | Contract | Real responses are validated against the served OpenAPI schemas |
 | Query plans | `EXPLAIN` on 50,000 events: each list query uses its index with no sort |
 | Constraints | Every database constraint rejects bad data |
@@ -560,7 +559,8 @@ Prettier and ESLint with `typescript-eslint` (strict, type-checked) keep format 
 | Indexes | One index per named query | An index per filter combination | [0013](docs/adr/0013-indexes.md) |
 | Cache freshness | Delete on write for one event, 60-second expiry for lists | A 5-second expiry for one event | [0014](docs/adr/0014-cache-freshness.md) |
 | Cache location | One shared Redis | A cache in each instance | [0015](docs/adr/0015-shared-cache.md) |
-| Failure modes | In-flight sharing, pool cap, stale data on database outage | No cap; refuse all reads on outage | [0016](docs/adr/0016-failure-modes.md) |
+| Local fallback cache | A 5-second local cache, written only while Redis fails | Write to both caches all the time | [0043](docs/adr/0043-local-fallback-cache.md) |
+| Failure modes | In-flight sharing, pool cap, local cache on Redis outage, stale data on database outage | No cap; refuse all reads on outage | [0016](docs/adr/0016-failure-modes.md) |
 | Time limits | 200 ms pool wait, 1 second statement limit, `Retry-After` on every 503 | One limit for the whole request | [0040](docs/adr/0040-time-limits-and-retry-after.md) |
 | Error format | Problem Details with stable codes; 400, 422 and 409 kept apart | Status only; custom format | [0018](docs/adr/0018-error-format.md), [0037](docs/adr/0037-refusals-of-well-formed-input.md) |
 | Response shape | `generatedAt` plus standard headers | Envelope with a `stale` flag | [0019](docs/adr/0019-response-shape.md) |
@@ -607,11 +607,10 @@ Every row below is a known limitation of this implementation ([ADR-0021](docs/ad
 | Match actions, score, statistics | Out of scope. A neighbouring service owns them ([ADR-0010](docs/adr/0010-write-commands.md)) |
 | Load balancer, several instances, CDN | Only the single-process service is built and tested |
 | Read replicas, standby database, date partitioning | Not built ([ADR-0001](docs/adr/0001-load-assumptions.md), [ADR-0016](docs/adr/0016-failure-modes.md)) |
-| Local cache during a Redis outage | Not built. During an outage every read goes to the database ([ADR-0016](docs/adr/0016-failure-modes.md)) |
 | Rate limiting per consumer | Not built |
 | Metrics and tracing | Not built. Structured logs are built |
 
-Extension points ([ADR-0021](docs/adr/0021-implementation-boundary.md)): a new sport is a row in `sports`, and phases for it are one table entry. The schema allows more than two competitors per event, but create and the commands do not. The cache port has an in-memory adapter next to Redis.
+Extension points ([ADR-0021](docs/adr/0021-implementation-boundary.md)): a new sport is a row in `sports`, and phases for it are one table entry. The schema allows more than two competitors per event, but create and the commands do not. The cache port has two adapters, Redis and an in-memory one, and the fallback adapter combines them ([ADR-0043](docs/adr/0043-local-fallback-cache.md)).
 
 ### Other limitations
 
@@ -622,6 +621,7 @@ Extension points ([ADR-0021](docs/adr/0021-implementation-boundary.md)): a new s
 - Time ([ADR-0005](docs/adr/0005-time-in-utc.md)): local time at the venue cannot be shown from this service's data.
 - Queries ([ADR-0011](docs/adr/0011-read-queries.md), [ADR-0012](docs/adr/0012-cursor-pagination.md), [ADR-0017](docs/adr/0017-rest-api.md)): no text search, no custom sort, no filter by source, no total count, no jump to page N. A reschedule during paging can show an event twice or not at all. Every consumer gets the full event, and a new query shape needs a change in the service.
 - Consistency ([ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0019](docs/adr/0019-response-shape.md), [ADR-0009](docs/adr/0009-optimistic-concurrency.md)): during a database outage data up to 1 hour old is served, with its age visible in `generatedAt` and `Age`. A CDN may hold a list page for 60 seconds. A conflict after a timeout is ambiguous, and the writer resolves it by reading.
+- Redis outage ([ADR-0043](docs/adr/0043-local-fallback-cache.md)): a delete on write reaches only the instance that handled the command, so another instance can serve the old state of an event for up to 5 seconds. A slow but connected Redis costs each request up to 200 ms before the local cache answers, because no circuit breaker is built. The local cache is lost on restart and is not shared.
 - Cache ([ADR-0014](docs/adr/0014-cache-freshness.md)): many distinct time windows or limits lower the hit rate. It is not measured.
 - Types ([ADR-0031](docs/adr/0031-phase-checked-at-run-time.md), [ADR-0033](docs/adr/0033-branded-types-for-identifiers-only.md)): the compiler does not catch a wrong sport and phase pair, or a source passed as an external ID. A `Date` can hold an invalid date. Code that calls the domain without the HTTP layer must pass valid values.
 - Measurement ([ADR-0013](docs/adr/0013-indexes.md), [ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0040](docs/adr/0040-time-limits-and-retry-after.md)): query plans are checked on 50,000 events. No load test exists. Pool size, waits and timeouts are untuned estimates.
@@ -636,7 +636,7 @@ These items come from the "described" parts above and from the consequences reco
 - Add the transactional outbox, a relay and a stream, so consumers that need less than 60 seconds can subscribe ([ADR-0020](docs/adr/0020-change-propagation.md)).
 - Run a load test and tune the pool size, the waits, the timeouts and the cache hit rate against it ([ADR-0014](docs/adr/0014-cache-freshness.md), [ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0040](docs/adr/0040-time-limits-and-retry-after.md)).
 - Add metrics and tracing hooks next to the structured logs ([ADR-0021](docs/adr/0021-implementation-boundary.md)).
-- Add the short cache inside each instance for a Redis outage, run several instances behind a load balancer and a CDN, and add read replicas and a standby database when the primary becomes the limit ([ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0001](docs/adr/0001-load-assumptions.md)).
+- Run several instances behind a load balancer and a CDN, and add read replicas and a standby database when the primary becomes the limit ([ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0001](docs/adr/0001-load-assumptions.md)).
 - Add an API for sports and competitors, or take them from a reference-data service ([ADR-0027](docs/adr/0027-names-in-event-responses.md)).
 - Add a flag that the scheduled start is confirmed, and leave actual start and end times to the match-actions service ([ADR-0036](docs/adr/0036-current-state-only.md)).
 - Move phases into a table if the number of sports with phases grows ([ADR-0004](docs/adr/0004-sport-specific-phase.md), [ADR-0031](docs/adr/0031-phase-checked-at-run-time.md)).
@@ -648,7 +648,7 @@ These items come from the "described" parts above and from the consequences reco
 ## Further reading
 
 - [`docs/system-design.md`](docs/system-design.md): the full system description with both diagrams and the request flows.
-- [`docs/adr/`](docs/adr/): 42 decision records, each with context, alternatives and consequences.
+- [`docs/adr/`](docs/adr/): 43 decision records, each with context, alternatives and consequences.
 - [`docs/requirements/`](docs/requirements/): the requirements with IDs and acceptance criteria.
 - [`docs/api-examples.md`](docs/api-examples.md): runnable curl flows.
 - [`docs/plan.md`](docs/plan.md): the implementation steps.

@@ -10,9 +10,8 @@ Order of cuts when time runs short is fixed in [ADR-0021](adr/0021-implementatio
 - Linter with the layer import rules of `AGENTS.md`.
 - Vitest with three projects: domain, persistence, API.
 - Docker Compose with PostgreSQL and Redis.
-- Empty layer folders and one trivial test per level.
 
-Done when: `typecheck`, `lint` and `test:domain` pass; a deliberate forbidden import fails the linter.
+Done when: `typecheck` and `lint` pass; a deliberate forbidden import fails the linter. Layer folders and tests arrive with the first code of each layer.
 
 ## Step 2 - Domain
 

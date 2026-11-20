@@ -1,17 +1,16 @@
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { startTestDatabase, type TestDatabase } from "./support/database.ts";
+import type { Database } from "../../src/infrastructure/persistence/database.ts";
+import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "./support/database.ts";
 
 // PER-2: the database rejects bad data by itself. Each test writes one bad
 // row with plain SQL and names the constraint that must refuse it.
 
-const SALZBURG = "0198c5a0-0000-7000-8000-000000000001";
-const STURM = "0198c5a0-0000-7000-8000-000000000002";
 const EVENT = "0198c5a0-7b1e-7d3a-9c4e-2f6a8b1d5e90";
 const UNKNOWN = "0198c5a0-ffff-7000-8000-00000000ffff";
 
 let testDatabase: TestDatabase | undefined;
-let db: Kysely<unknown>;
+let db: Kysely<Database>;
 
 beforeAll(async () => {
   testDatabase = await startTestDatabase();
@@ -24,12 +23,7 @@ afterAll(async () => {
 
 // Every test starts with one sport and two competitors.
 beforeEach(async () => {
-  await sql`TRUNCATE event_competitors, events, competitors, sports`.execute(db);
-  await sql`INSERT INTO sports (code, name) VALUES ('football', 'Football')`.execute(db);
-  await sql`
-    INSERT INTO competitors (id, sport_code, name)
-    VALUES (${SALZBURG}, 'football', 'Salzburg'), (${STURM}, 'football', 'Sturm')
-  `.execute(db);
+  await resetData(db);
 });
 
 const VALID_EVENT = {

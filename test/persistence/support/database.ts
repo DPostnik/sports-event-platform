@@ -1,10 +1,11 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Kysely, PostgresDialect } from "kysely";
+import { Kysely, PostgresDialect, sql } from "kysely";
 import pg from "pg";
+import type { Database } from "../../../src/infrastructure/persistence/database.ts";
 import { migrateToLatest } from "../../../src/infrastructure/persistence/migrate.ts";
 
 export interface TestDatabase {
-  readonly db: Kysely<unknown>;
+  readonly db: Kysely<Database>;
   stop(): Promise<void>;
 }
 
@@ -13,7 +14,7 @@ export interface TestDatabase {
 export async function startTestDatabase(): Promise<TestDatabase> {
   const container = await new PostgreSqlContainer("postgres:17").start();
   const pool = new pg.Pool({ connectionString: container.getConnectionUri() });
-  const db = new Kysely<unknown>({ dialect: new PostgresDialect({ pool }) });
+  const db = new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
   await migrateToLatest(db);
 
   return {
@@ -23,4 +24,17 @@ export async function startTestDatabase(): Promise<TestDatabase> {
       await container.stop();
     },
   };
+}
+
+export const SALZBURG = "0198c5a0-0000-7000-8000-000000000001";
+export const STURM = "0198c5a0-0000-7000-8000-000000000002";
+
+// Empties every table, then stores one sport and two competitors.
+export async function resetData(db: Kysely<Database>): Promise<void> {
+  await sql`TRUNCATE event_competitors, events, competitors, sports`.execute(db);
+  await sql`INSERT INTO sports (code, name) VALUES ('football', 'Football')`.execute(db);
+  await sql`
+    INSERT INTO competitors (id, sport_code, name)
+    VALUES (${SALZBURG}, 'football', 'Salzburg'), (${STURM}, 'football', 'Sturm')
+  `.execute(db);
 }

@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import { Migrator, type Migration } from "kysely/migration";
+import type { Database } from "./database.ts";
 import * as sportsAndCompetitors from "./migrations/0001-sports-and-competitors.ts";
 import * as events from "./migrations/0002-events.ts";
 import * as eventCompetitors from "./migrations/0003-event-competitors.ts";
@@ -16,7 +17,7 @@ const MIGRATIONS: Record<string, Migration> = {
 
 // PER-8: brings an empty or older database to the current schema. Kysely
 // records the applied migrations in its own table and runs only the new ones.
-export async function migrateToLatest(db: Kysely<unknown>): Promise<void> {
+export async function migrateToLatest(db: Kysely<Database>): Promise<void> {
   const migrator = new Migrator({
     db,
     provider: { getMigrations: () => Promise.resolve(MIGRATIONS) },

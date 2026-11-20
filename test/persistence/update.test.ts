@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { EventRepository } from "#src/application/event-repository.ts";
 import { applyCommand, type Command } from "#src/domain/commands.ts";
@@ -44,6 +44,18 @@ async function storedEvent(): Promise<Event | undefined> {
   return view?.event;
 }
 
+// `updated_at` is internal and not part of an event, so the test reads the
+// columns. The database compares them: it keeps microseconds, and a
+// JavaScript Date keeps only milliseconds.
+async function changedAfterCreate(): Promise<boolean> {
+  const row = await db
+    .selectFrom("events")
+    .select(sql<boolean>`updated_at > created_at`.as("changed"))
+    .where("id", "=", SCHEDULED.id)
+    .executeTakeFirstOrThrow();
+  return row.changed;
+}
+
 describe("Write a changed event (ADR-0009, ADR-0030)", () => {
   it("stores the event that each command returns", async () => {
     // One life of an event that uses five commands. The sixth, cancel, is in
@@ -73,6 +85,14 @@ describe("Write a changed event (ADR-0009, ADR-0030)", () => {
 
     expect(await repository.update(cancelled, 1)).toBe(false);
     expect(await storedEvent()).toEqual(started);
+  });
+
+  it("sets the time of the last change (ADR-0036)", async () => {
+    expect(await changedAfterCreate()).toBe(false);
+
+    await repository.update(decide(SCHEDULED, { kind: "start", expectedVersion: 1 }), 1);
+
+    expect(await changedAfterCreate()).toBe(true);
   });
 
   it("applies one change when ten writers use the same expected version", async () => {

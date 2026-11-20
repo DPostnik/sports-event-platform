@@ -17,7 +17,7 @@ Done when: `typecheck`, `lint` and `test:domain` pass; a deliberate forbidden im
 ## Step 2 - Domain
 
 - Branded types: event ID, competitor ID, sport code, source, external ID, UTC instant, version.
-- Event as a discriminated union over the five statuses, with the live phase typed per sport (ADR-0002, ADR-0004).
+- Event as a discriminated union over the five statuses, with the live phase checked per sport at run time (ADR-0002, ADR-0004, ADR-0031).
 - The six commands as pure functions: current event and input in, new event or typed error out (ADR-0010).
 - Create with exactly one home and one away competitor of the event's sport (ADR-0003).
 - Typed domain errors.

@@ -1,6 +1,6 @@
 # ADR-0021: Implementation boundary - built, extension point, described
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0031](0031-phase-checked-at-run-time.md)
 
 Date: 2026-11-19
 

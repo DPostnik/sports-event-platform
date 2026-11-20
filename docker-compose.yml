@@ -1,4 +1,4 @@
-# PostgreSQL for a local run of the service, `npm run migrate` and `npm run seed`.
+# PostgreSQL and Redis for local development.
 # Tests do not use this file: they start their own containers (ADR-0026).
 services:
   postgres:
@@ -13,6 +13,16 @@ services:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sports -d sports"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

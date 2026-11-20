@@ -27,6 +27,9 @@ const environmentSchema = z.object({
   DB_STATEMENT_TIMEOUT_MS: positiveInteger.default(1000),
   OVERLOADED_RETRY_AFTER_SECONDS: positiveInteger.default(1),
   UNAVAILABLE_RETRY_AFTER_SECONDS: positiveInteger.default(5),
+  REDIS_COMMAND_TIMEOUT_MS: positiveInteger.default(200),
+  LOCAL_CACHE_TTL_SECONDS: positiveInteger.default(5),
+  LOCAL_CACHE_MAX_ENTRIES: positiveInteger.default(1000),
   WRITER_KEYS: writerKeys,
   HOST: z.string().trim().min(1).default("0.0.0.0"),
   PORT: z
@@ -44,6 +47,9 @@ export interface Configuration {
   readonly poolWaitMs: number;
   readonly statementTimeoutMs: number;
   readonly retryAfterSeconds: Readonly<Record<"OVERLOADED" | "UNAVAILABLE", number>>;
+  readonly redisCommandTimeoutMs: number;
+  readonly localCacheTtlSeconds: number;
+  readonly localCacheMaxEntries: number;
   readonly writerKeys: ReadonlyMap<string, string>;
   readonly host: string;
   readonly port: number;
@@ -73,6 +79,9 @@ export function readConfiguration(environment: NodeJS.ProcessEnv): Configuration
       UNAVAILABLE: parsed.data.UNAVAILABLE_RETRY_AFTER_SECONDS,
     },
     redisUrl: parsed.data.REDIS_URL,
+    redisCommandTimeoutMs: parsed.data.REDIS_COMMAND_TIMEOUT_MS,
+    localCacheTtlSeconds: parsed.data.LOCAL_CACHE_TTL_SECONDS,
+    localCacheMaxEntries: parsed.data.LOCAL_CACHE_MAX_ENTRIES,
     poolSize: parsed.data.DB_POOL_SIZE,
     poolWaitMs: parsed.data.DB_POOL_WAIT_MS,
     statementTimeoutMs: parsed.data.DB_STATEMENT_TIMEOUT_MS,

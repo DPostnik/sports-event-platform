@@ -18,8 +18,8 @@ When Redis fails, every read goes to the database. [ADR-0016](0016-failure-modes
 - The local cache holds at most 1,000 entries. When it is full, it evicts the oldest entry.
 - Log every Redis failure as a warning.
 - Without `REDIS_URL` the service still runs with no cache at all.
-- The 5 seconds and the 1,000 entries are starting estimates. They are constants in `src/main.ts`, not configuration.
-- Test the two adapters without Docker in `test/persistence/in-memory-cache.test.ts` and `test/persistence/fallback-cache.test.ts`. `test/api/redis-outage.test.ts` checks on the real stack that a repeated read is answered locally for 5 seconds while Redis is down.
+- The 5 seconds and the 1,000 entries are starting estimates. They are configuration, like the pool limits of [ADR-0016](0016-failure-modes.md): `LOCAL_CACHE_TTL_SECONDS` and `LOCAL_CACHE_MAX_ENTRIES`. The Redis command timeout, 200 ms by default, is configuration too: `REDIS_COMMAND_TIMEOUT_MS`.
+- Test the two adapters without Docker in `test/persistence/in-memory-cache.test.ts` and `test/persistence/fallback-cache.test.ts`. `test/api/redis-outage.test.ts` checks on the real stack that a repeated read is answered locally for the configured lifetime while Redis is down.
 
 ## Alternatives considered
 

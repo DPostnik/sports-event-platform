@@ -59,7 +59,7 @@ describe("Cache outage (ADR-0016)", () => {
     expect(page.json<unknown>()).toMatchObject({ events: [live] });
   });
 
-  it("answers a repeated read from the local cache for 5 seconds while Redis is down (ADR-0043)", async ({
+  it("answers a repeated read from the local cache for the configured lifetime while Redis is down (ADR-0043)", async ({
     onTestFinished,
   }) => {
     const database = await startTestDatabase();
@@ -79,6 +79,7 @@ describe("Cache outage (ADR-0016)", () => {
         DATABASE_URL: database.connectionString,
         WRITER_KEYS: writerKeyEnvironment,
         REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
+        LOCAL_CACHE_TTL_SECONDS: "3",
       }),
       false,
     );
@@ -104,16 +105,16 @@ describe("Cache outage (ADR-0016)", () => {
       const firstGeneratedAt = first.json<{ generatedAt: string }>().generatedAt;
       expect(firstGeneratedAt).toBe(new Date(firstReadAt).toISOString());
 
-      vi.setSystemTime(firstReadAt + 4000);
+      vi.setSystemTime(firstReadAt + 2000);
       const local = await app.inject(eventUrl);
       expect(local.statusCode, local.body).toBe(200);
       expect(local.json<unknown>()).toMatchObject({ generatedAt: firstGeneratedAt });
-      expect(local.headers.age).toBe("4");
+      expect(local.headers.age).toBe("2");
 
-      vi.setSystemTime(firstReadAt + 5000);
+      vi.setSystemTime(firstReadAt + 3000);
       const expired = await app.inject(eventUrl);
       expect(expired.statusCode, expired.body).toBe(200);
-      expect(expired.json<unknown>()).toMatchObject({ generatedAt: new Date(firstReadAt + 5000).toISOString() });
+      expect(expired.json<unknown>()).toMatchObject({ generatedAt: new Date(firstReadAt + 3000).toISOString() });
       expect(expired.headers.age).toBe("0");
     } finally {
       vi.useRealTimers();

@@ -12,10 +12,6 @@ import { databaseFailure } from "#src/infrastructure/persistence/database-failur
 import { createDatabase } from "#src/infrastructure/persistence/connection.ts";
 import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
 
-// Local fallback cache limits (ADR-0043): 5 seconds of life, 1,000 entries.
-const LOCAL_CACHE_TTL_SECONDS = 5;
-const LOCAL_CACHE_MAX_ENTRIES = 1000;
-
 export async function buildService(config: Configuration, logger = true) {
   const db = createDatabase(config.databaseUrl, {
     max: config.poolSize,
@@ -39,7 +35,7 @@ export async function buildService(config: Configuration, logger = true) {
       : createClient({
           url: config.redisUrl,
           disableOfflineQueue: true,
-          commandOptions: { timeout: 200 },
+          commandOptions: { timeout: config.redisCommandTimeoutMs },
         });
   const clock = { now: () => new Date() };
   // The app logger exists only after buildApp, which needs the cache first.
@@ -52,8 +48,8 @@ export async function buildService(config: Configuration, logger = true) {
         redis &&
         createFallbackCache(
           createRedisCache(redis),
-          createInMemoryCache(clock, LOCAL_CACHE_MAX_ENTRIES),
-          LOCAL_CACHE_TTL_SECONDS,
+          createInMemoryCache(clock, config.localCacheMaxEntries),
+          config.localCacheTtlSeconds,
           (error) => {
             reportCacheFailure(error);
           },

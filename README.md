@@ -78,6 +78,9 @@ The service reads environment variables and validates them at startup. An invali
 | `DB_STATEMENT_TIMEOUT_MS` | `1000` | PostgreSQL `statement_timeout` ([ADR-0040](docs/adr/0040-time-limits-and-retry-after.md)) |
 | `OVERLOADED_RETRY_AFTER_SECONDS` | `1` | `Retry-After` of a 503 `OVERLOADED` |
 | `UNAVAILABLE_RETRY_AFTER_SECONDS` | `5` | `Retry-After` of a 503 `UNAVAILABLE` |
+| `REDIS_COMMAND_TIMEOUT_MS` | `200` | Time limit of one Redis command before the local cache answers ([ADR-0043](docs/adr/0043-local-fallback-cache.md)) |
+| `LOCAL_CACHE_TTL_SECONDS` | `5` | Longest life of an entry in the local fallback cache ([ADR-0043](docs/adr/0043-local-fallback-cache.md)) |
+| `LOCAL_CACHE_MAX_ENTRIES` | `1000` | Entries the local fallback cache holds before it evicts the oldest ([ADR-0043](docs/adr/0043-local-fallback-cache.md)) |
 | `WRITER_KEYS` | `{}` | JSON object: lowercase SHA-256 key hash to source name. Unset means read-only ([ADR-0042](docs/adr/0042-writer-authentication.md)) |
 | `HOST` | `0.0.0.0` | Listen address |
 | `PORT` | `3000` | Listen port |
@@ -494,7 +497,7 @@ Persistence and API tests start real PostgreSQL and Redis containers with Testco
 | Property-based (fast-check) | For any sequence of commands: a terminal status never changes, the version rises by one per applied command and never otherwise, a refused command changes nothing |
 | Type-level | `@ts-expect-error` lines in `event.test.ts` and `ids.test.ts`, checked by `npm run typecheck` |
 | Concurrency | Two writers with one `expectedVersion`: exactly one wins. Two creates of one source identity: one event. Many identical reads: one database read |
-| Failure mode | Redis stopped (a repeated read is answered locally for 5 seconds), PostgreSQL stopped (cached reads, refused writes), statement timeout versus pool wait, `Retry-After` on every 503 |
+| Failure mode | Redis stopped (a repeated read is answered locally for the configured lifetime), PostgreSQL stopped (cached reads, refused writes), statement timeout versus pool wait, `Retry-After` on every 503 |
 | Contract | Real responses are validated against the served OpenAPI schemas |
 | Query plans | `EXPLAIN` on 50,000 events: each list query uses its index with no sort |
 | Constraints | Every database constraint rejects bad data |
@@ -624,7 +627,7 @@ Extension points ([ADR-0021](docs/adr/0021-implementation-boundary.md)): a new s
 - Redis outage ([ADR-0043](docs/adr/0043-local-fallback-cache.md)): a delete on write reaches only the instance that handled the command, so another instance can serve the old state of an event for up to 5 seconds. A slow but connected Redis costs each request up to 200 ms before the local cache answers, because no circuit breaker is built. The local cache is lost on restart and is not shared.
 - Cache ([ADR-0014](docs/adr/0014-cache-freshness.md)): many distinct time windows or limits lower the hit rate. It is not measured.
 - Types ([ADR-0031](docs/adr/0031-phase-checked-at-run-time.md), [ADR-0033](docs/adr/0033-branded-types-for-identifiers-only.md)): the compiler does not catch a wrong sport and phase pair, or a source passed as an external ID. A `Date` can hold an invalid date. Code that calls the domain without the HTTP layer must pass valid values.
-- Measurement ([ADR-0013](docs/adr/0013-indexes.md), [ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0040](docs/adr/0040-time-limits-and-retry-after.md)): query plans are checked on 50,000 events. No load test exists. Pool size, waits and timeouts are untuned estimates.
+- Measurement ([ADR-0013](docs/adr/0013-indexes.md), [ADR-0016](docs/adr/0016-failure-modes.md), [ADR-0040](docs/adr/0040-time-limits-and-retry-after.md)): query plans are checked on 50,000 events. No load test exists. Pool size, waits, timeouts and the local cache limits are untuned estimates.
 - Schema ([ADR-0035](docs/adr/0035-same-sport-enforced-by-schema.md)): the sport of an event or competitor cannot change while a link row refers to it.
 
 ## What I would change with more time

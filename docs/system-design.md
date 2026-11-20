@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md) (superseded by ADR-0042), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md), [ADR-0037](adr/0037-refusals-of-well-formed-input.md), [ADR-0038](adr/0038-repeated-create-returns-stored-event.md), [ADR-0039](adr/0039-revalidation-and-weak-etags.md), [ADR-0040](adr/0040-time-limits-and-retry-after.md), [ADR-0041](adr/0041-time-window-bounds.md), [ADR-0042](adr/0042-writer-authentication.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md) (superseded by ADR-0042), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md), [ADR-0037](adr/0037-refusals-of-well-formed-input.md), [ADR-0038](adr/0038-repeated-create-returns-stored-event.md), [ADR-0039](adr/0039-revalidation-and-weak-etags.md), [ADR-0040](adr/0040-time-limits-and-retry-after.md), [ADR-0041](adr/0041-time-window-bounds.md), [ADR-0042](adr/0042-writer-authentication.md), [ADR-0043](adr/0043-local-fallback-cache.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -154,13 +154,13 @@ The rules are defined in [ADR-0016](adr/0016-failure-modes.md) and [ADR-0040](ad
 | Failure | Behaviour |
 | ------- | --------- |
 | A popular cache entry expires | Concurrent requests for one key inside an instance share one in-flight database read. Always on. |
-| The cache is down | Reads go to the database. A fixed connection pool caps the load. A request that waits more than 200 ms for a connection is refused as overloaded. |
+| The cache is down | A local cache inside each instance answers repeated reads for up to 5 seconds ([ADR-0043](adr/0043-local-fallback-cache.md)). The other reads go to the database. A fixed connection pool caps the load. A request that waits more than 200 ms for a connection is refused as overloaded. |
 | The database is slow | A statement that runs longer than 1 second is cancelled by the database. The request is handled as in the next row. |
 | The database is down | Cached entries up to 1 hour old are served. Their age is visible in `generatedAt` and the `Age` header. Reads without an entry and all writes are refused as unavailable. |
 
 Every refusal with status 503 carries `Retry-After`: 1 second when overloaded, 5 seconds when unavailable. The limits and the waits are configuration.
 
-Described, not built: a cache of a few seconds inside each instance for a shared-cache outage, and a standby database with automatic failover.
+Described, not built: a standby database with automatic failover.
 
 ## API
 
@@ -207,7 +207,7 @@ Peak case:
 
 - 12,000 requests per second with a 90% cache hit rate leaves 1,200 database reads per second.
 - At 10 ms per read, about 12 reads are in flight. A small connection pool covers this.
-- During a cache outage all 12,000 requests per second reach the database. At 10 ms that is about 120 reads in flight, more than the pool. [ADR-0016](adr/0016-failure-modes.md) caps the pool and refuses the excess.
+- During a cache outage without the local cache, all 12,000 requests per second would reach the database. At 10 ms that is about 120 reads in flight, more than the pool. [ADR-0016](adr/0016-failure-modes.md) caps the pool and refuses the excess. The local cache of [ADR-0043](adr/0043-local-fallback-cache.md) cuts this load to at most one read per key, per instance, per 5 seconds, for the 1,000 keys it holds.
 
 ## Entities
 

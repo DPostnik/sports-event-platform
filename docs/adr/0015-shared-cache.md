@@ -1,6 +1,6 @@
 # ADR-0015: One shared cache for all instances
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0043](0043-local-fallback-cache.md)
 
 Date: 2026-11-19
 

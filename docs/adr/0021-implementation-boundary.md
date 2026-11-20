@@ -1,6 +1,6 @@
 # ADR-0021: Implementation boundary - built, extension point, described
 
-Status: Accepted, amended by [ADR-0031](0031-phase-checked-at-run-time.md), [ADR-0032](0032-duplicate-guard-not-built.md) and [ADR-0042](0042-writer-authentication.md)
+Status: Accepted, amended by [ADR-0031](0031-phase-checked-at-run-time.md), [ADR-0032](0032-duplicate-guard-not-built.md), [ADR-0042](0042-writer-authentication.md) and [ADR-0043](0043-local-fallback-cache.md)
 
 Date: 2026-11-19
 

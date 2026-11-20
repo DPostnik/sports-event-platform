@@ -64,6 +64,14 @@ Done when: `npm test` passes on all levels.
 
 Done when: `typecheck`, `lint` and `test:api` pass.
 
+## Step 5b - Local fallback cache
+
+- Wrap Redis with the fallback adapter in the composition root, as approved in [ADR-0043](adr/0043-local-fallback-cache.md).
+- Bound the in-memory cache to 1,000 entries and cap the local lifetime at 5 seconds.
+- Cover the two adapters at the persistence level and the outage behaviour at the API level.
+
+Done when: `typecheck`, `lint` and `npm test` pass.
+
 ## Step 6 - Submission
 
 - `README.md` with every section the brief requires, built from the ADRs.

@@ -1,6 +1,6 @@
 # ADR-0007: Source identity and single ownership of an event
 
-Status: Accepted, amended by [ADR-0028](0028-source-ownership-needs-authentication.md)
+Status: Accepted, amended by [ADR-0028](0028-source-ownership-needs-authentication.md) and [ADR-0038](0038-repeated-create-returns-stored-event.md)
 
 Date: 2026-11-19
 

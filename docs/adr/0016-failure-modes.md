@@ -1,6 +1,6 @@
 # ADR-0016: Behaviour when a cache entry expires, the cache fails or the database fails
 
-Status: Accepted, amended by [ADR-0019](0019-response-shape.md)
+Status: Accepted, amended by [ADR-0019](0019-response-shape.md) and [ADR-0040](0040-time-limits-and-retry-after.md)
 
 Date: 2026-11-19
 

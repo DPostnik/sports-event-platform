@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md), [ADR-0031](adr/0031-phase-checked-at-run-time.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md), [ADR-0033](adr/0033-branded-types-for-identifiers-only.md), [ADR-0034](adr/0034-validation-boundaries.md), [ADR-0035](adr/0035-same-sport-enforced-by-schema.md), [ADR-0036](adr/0036-current-state-only.md), [ADR-0037](adr/0037-refusals-of-well-formed-input.md), [ADR-0038](adr/0038-repeated-create-returns-stored-event.md), [ADR-0039](adr/0039-revalidation-and-weak-etags.md), [ADR-0040](adr/0040-time-limits-and-retry-after.md), [ADR-0041](adr/0041-time-window-bounds.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -64,7 +64,7 @@ sequenceDiagram
 
 There are two read operations ([ADR-0011](adr/0011-read-queries.md)): one event by ID, and one list.
 
-- List filters, all optional: time window, sport, status, competitor.
+- List filters, all optional: time window, sport, status, competitor. The time window includes its start and excludes its end ([ADR-0041](adr/0041-time-window-bounds.md)).
 - List order is fixed: start time, then event ID.
 - Paging uses a cursor on that order: 50 events by default, 100 at most ([ADR-0012](adr/0012-cursor-pagination.md)). The consumer chooses the size with `limit`, from 1 to 100 ([ADR-0029](adr/0029-list-page-size-parameter.md)).
 - Each query has one index, and every list index ends with the list order ([ADR-0013](adr/0013-indexes.md)).
@@ -92,7 +92,7 @@ sequenceDiagram
 
 1. The API receives a create request with `source` and `externalId`.
 2. One database transaction persists the event with its `(source, external_id)` pair and its two competitor links.
-3. A repeated create with the same pair returns the stored event.
+3. A repeated create with the same pair returns the stored event with status 200. A new event is answered with status 201. The data of a repeat is not compared, and a repeat never changes the event ([ADR-0038](adr/0038-repeated-create-returns-stored-event.md)).
 4. The same real match sent by another source becomes a second event. The service has no duplicate guard. Preventing duplicates belongs to reconciliation upstream ([ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0032](adr/0032-duplicate-guard-not-built.md)).
 5. The API returns success after the commit.
 
@@ -120,13 +120,16 @@ There is no generic update operation, see [ADR-0010](adr/0010-write-commands.md)
 
 ### Failure modes
 
-The rules are defined in [ADR-0016](adr/0016-failure-modes.md).
+The rules are defined in [ADR-0016](adr/0016-failure-modes.md) and [ADR-0040](adr/0040-time-limits-and-retry-after.md).
 
 | Failure | Behaviour |
 | ------- | --------- |
 | A popular cache entry expires | Concurrent requests for one key inside an instance share one in-flight database read. Always on. |
-| The cache is down | Reads go to the database. A fixed connection pool with a short wait caps the load; excess requests are refused as overloaded. |
+| The cache is down | Reads go to the database. A fixed connection pool caps the load. A request that waits more than 200 ms for a connection is refused as overloaded. |
+| The database is slow | A statement that runs longer than 1 second is cancelled by the database. The request is handled as in the next row. |
 | The database is down | Cached entries up to 1 hour old are served. Their age is visible in `generatedAt` and the `Age` header. Reads without an entry and all writes are refused as unavailable. |
+
+Every refusal with status 503 carries `Retry-After`: 1 second when overloaded, 5 seconds when unavailable. The limits and the waits are configuration.
 
 Described, not built: a cache of a few seconds inside each instance for a shared-cache outage, and a standby database with automatic failover.
 
@@ -141,9 +144,9 @@ The API is REST over HTTP with JSON ([ADR-0017](adr/0017-rest-api.md)).
 | List events | `GET /events` with filters, cursor and limit |
 | Six write commands | `POST /events/{id}/start`, `/finish`, `/postpone`, `/reschedule`, `/cancel`, `/phase` |
 
-Every error uses one format, RFC 9457 Problem Details, with a stable `code` ([ADR-0018](adr/0018-error-format.md)).
+Every error uses one format, RFC 9457 Problem Details, with a stable `code` ([ADR-0018](adr/0018-error-format.md)). Status 400 is a wrong format, 422 is correct format with data that breaks a rule, 409 is a conflict with the stored event ([ADR-0037](adr/0037-refusals-of-well-formed-input.md)).
 
-A success response has `generatedAt` at the top and the payload under `event` or `events`. Freshness is stated with `Cache-Control`, `ETag` and `Age`. There is no envelope and no stale flag ([ADR-0019](adr/0019-response-shape.md)). An event carries the names of its sport and competitors ([ADR-0027](adr/0027-names-in-event-responses.md)).
+A success response has `generatedAt` at the top and the payload under `event` or `events`. Freshness is stated with `Cache-Control`, `ETag` and `Age`. There is no envelope and no stale flag ([ADR-0019](adr/0019-response-shape.md)). One event is sent with `no-cache`, so a cache asks the service before each reuse. A list page is sent with `max-age=60`. Every `ETag` is weak ([ADR-0039](adr/0039-revalidation-and-weak-etags.md)). An event carries the names of its sport and competitors ([ADR-0027](adr/0027-names-in-event-responses.md)).
 
 ## Load and volume assumptions
 

@@ -27,7 +27,7 @@ Done when: `test:domain` passes without Docker and the domain imports nothing ou
 
 - Migrations: `sports`, `competitors`, `events`, `event_competitors`, constraints, the composite foreign keys that enforce the same sport of event and competitor (ADR-0035) and the indexes of ADR-0013.
 - Kysely schema types and the row-to-domain mapper with domain checks (ADR-0034).
-- Repository: idempotent create (ADR-0007), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012).
+- Repository: idempotent create (ADR-0007), version-checked write (ADR-0009, ADR-0030), get, list with filters and cursor (ADR-0011, ADR-0012, ADR-0041).
 - Seed data: two sports, four competitors, the two example events of the brief.
 - Docker Compose with PostgreSQL for the migrate and seed commands.
 - Tests: each constraint rejects bad data; concurrent writers; concurrent creates; cursor stability; query plans on a populated database.
@@ -37,8 +37,8 @@ Done when: `test:persistence` passes against a real PostgreSQL.
 ## Step 4 - API
 
 - Application use cases on top of the repository port.
-- Fastify routes of ADR-0017 with Zod schemas (ADR-0025).
-- Error mapping (ADR-0018) and response shape (ADR-0019), without caching headers yet.
+- Fastify routes of ADR-0017 with Zod schemas (ADR-0025). Create answers 201 or 200 (ADR-0038).
+- Error mapping (ADR-0018, ADR-0037) and response shape (ADR-0019), without caching headers yet.
 - Generated OpenAPI description, served by the service.
 - Configuration from environment, validated at startup; health and readiness endpoints; graceful shutdown.
 - Tests: every route, every error code, conformance of responses to the OpenAPI description.
@@ -49,8 +49,8 @@ Done when: `test:api` passes and the two example events of the brief can be crea
 
 - Cache port, Redis and in-memory implementations (ADR-0015). Redis joins Docker Compose.
 - Read-through for one event and for list pages; delete on write; 60-second expiry (ADR-0014).
-- `Cache-Control`, `ETag`, `Age`, conditional requests (ADR-0019).
-- In-flight read sharing and the connection pool cap (ADR-0016).
+- `Cache-Control`, weak `ETag`, `Age`, conditional requests (ADR-0019, ADR-0039).
+- In-flight read sharing and the connection pool cap (ADR-0016). Pool wait limit, statement time limit and `Retry-After` (ADR-0040).
 - Stale data during a database outage (ADR-0016).
 - Tests: delete on write is visible at once; many identical reads cause one database read; cache stopped; database stopped.
 

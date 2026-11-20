@@ -1,6 +1,6 @@
 # ADR-0018: One error format with stable error codes
 
-Status: Accepted, amended by [ADR-0032](0032-duplicate-guard-not-built.md)
+Status: Accepted, amended by [ADR-0032](0032-duplicate-guard-not-built.md), [ADR-0037](0037-refusals-of-well-formed-input.md) and [ADR-0040](0040-time-limits-and-retry-after.md)
 
 Date: 2026-11-19
 

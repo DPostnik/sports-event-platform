@@ -19,7 +19,7 @@ import {
   sendProblem,
   singleEventErrors,
   transportProblem,
-  unavailableProblem,
+  databaseProblem,
 } from "#src/http/problems.ts";
 import {
   createBody,
@@ -39,7 +39,8 @@ interface AppOptions {
   readonly events: Pick<EventUseCases, "create" | "get" | "list" | "command">;
   readonly clock: Clock;
   readonly checkReadiness: () => Promise<void>;
-  readonly isUnavailable?: (error: unknown) => boolean;
+  readonly databaseFailure: (error: unknown) => "OVERLOADED" | "UNAVAILABLE" | undefined;
+  readonly retryAfterSeconds: Readonly<Record<"OVERLOADED" | "UNAVAILABLE", number>>;
   readonly logger?: boolean;
 }
 
@@ -47,14 +48,19 @@ const healthResponse = z.strictObject({ status: z.literal("ok") });
 const emptyQuery = z.strictObject({});
 
 export async function buildApp(options: AppOptions) {
-  const { events, clock, checkReadiness, isUnavailable, logger = false } = options;
+  const { events, clock, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
+  function sendDatabaseProblem(reply: FastifyReply, code: "OVERLOADED" | "UNAVAILABLE") {
+    return sendProblem(reply.header("Retry-After", retryAfterSeconds[code]), databaseProblem(code));
+  }
+
   function handleError(error: unknown, request: FastifyRequest, reply: FastifyReply) {
     const invalid = transportProblem(error);
     if (invalid !== undefined) return sendProblem(reply, invalid);
 
-    if (isUnavailable?.(error) === true) {
-      request.log.warn({ err: error }, "Database unavailable");
-      return sendProblem(reply, unavailableProblem());
+    const failure = databaseFailure(error);
+    if (failure !== undefined) {
+      request.log.warn({ err: error, code: failure }, "Database request failed");
+      return sendDatabaseProblem(reply, failure);
     }
     request.log.error({ err: error }, "Unexpected request failure");
     return sendProblem(reply, internalProblem(request.id));
@@ -195,7 +201,7 @@ export async function buildApp(options: AppOptions) {
       await checkReadiness();
     } catch (error) {
       request.log.warn({ err: error }, "Database readiness check failed");
-      return sendProblem(reply, unavailableProblem());
+      return sendDatabaseProblem(reply, databaseFailure(error) ?? "UNAVAILABLE");
     }
     return { status: "ok" };
   });

@@ -4,25 +4,9 @@ import { EventUseCases } from "#src/application/event-use-cases.ts";
 import { readConfiguration, type Configuration } from "#src/config/environment.ts";
 import { parseEventId } from "#src/domain/ids.ts";
 import { buildApp } from "#src/http/app.ts";
+import { databaseFailure } from "#src/infrastructure/persistence/database-failure.ts";
 import { createDatabase } from "#src/infrastructure/persistence/connection.ts";
 import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
-
-function isDatabaseUnavailable(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  if (error instanceof AggregateError) {
-    const causes: readonly unknown[] = error.errors;
-    return causes.length > 0 && causes.every(isDatabaseUnavailable);
-  }
-  if (!("code" in error) || typeof error.code !== "string") {
-    return false;
-  }
-  return /^08[A-Z0-9]{3}$/.test(error.code) || [
-    "57P01", "57P02", "57P03",
-    "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH", "EAI_AGAIN", "ENOTFOUND",
-  ].includes(error.code);
-}
 
 export async function buildService(config: Configuration, logger = true) {
   const db = createDatabase(config.databaseUrl, {
@@ -48,7 +32,8 @@ export async function buildService(config: Configuration, logger = true) {
       checkReadiness: async () => {
         await sql`SELECT 1`.execute(db);
       },
-      isUnavailable: isDatabaseUnavailable,
+      databaseFailure,
+      retryAfterSeconds: config.retryAfterSeconds,
       logger,
     });
     app.addHook("onClose", () => db.destroy());

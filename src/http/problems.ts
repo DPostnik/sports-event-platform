@@ -43,6 +43,7 @@ const sportMismatch = defineProblem("COMPETITOR_SPORT_MISMATCH", 422, "Competito
   competitorId: z.guid(), competitorSport: z.string(), eventSport: z.string(),
 });
 const competitorNotFound = defineProblem("COMPETITOR_NOT_FOUND", 422, "Competitor not found", { competitorId: z.guid() });
+const overloaded = defineProblem("OVERLOADED", 503, "Overloaded", {});
 const unavailable = defineProblem("UNAVAILABLE", 503, "Unavailable", {});
 const internal = defineProblem("INTERNAL", 500, "Internal error", { requestId: z.string() });
 
@@ -56,7 +57,7 @@ export const baseErrors = {
 };
 export const eventErrors = {
   ...baseErrors,
-  503: problemResponse("Database unavailable", unavailable.schema),
+  503: problemResponse("Database overloaded or unavailable", z.union([overloaded.schema, unavailable.schema])),
 };
 export const singleEventErrors = {
   ...eventErrors,
@@ -139,7 +140,8 @@ export function transportProblem(error: unknown): Problem | undefined {
   return undefined;
 }
 
-export function unavailableProblem(): Problem {
+export function databaseProblem(code: "OVERLOADED" | "UNAVAILABLE"): Problem {
+  if (code === "OVERLOADED") return overloaded.body("The database connection pool is busy.", {});
   return unavailable.body("The database is temporarily unavailable.", {});
 }
 

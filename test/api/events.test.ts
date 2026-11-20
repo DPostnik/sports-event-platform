@@ -258,6 +258,7 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
 
       const response = await unavailable.inject("/ready");
       expect(response.statusCode).toBe(503);
+      expect(response.headers["retry-after"]).toBe("5");
       await expectDocumentedResponse(openApi, "GET", "/ready", response);
       expect(JSON.parse(response.body)).toMatchObject({ code: "UNAVAILABLE" });
     } finally {

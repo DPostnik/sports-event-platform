@@ -1,6 +1,6 @@
 import type { Kysely } from "kysely";
-import type { EventRepository } from "../../application/event-repository.ts";
-import { parseCompetitorId } from "../../domain/ids.ts";
+import type { EventCursor, EventFilters, EventRepository } from "../../application/event-repository.ts";
+import { parseCompetitorId, type EventId } from "../../domain/ids.ts";
 import type { Database } from "./database.ts";
 import { CorruptRowError, toEventView } from "./mapper.ts";
 
@@ -34,6 +34,61 @@ function selectEventRows(db: Kysely<Database>) {
       "away.id as away_competitor_id",
       "away.name as away_competitor_name",
     ]);
+}
+
+// The two read statements are exported so the query plan tests run EXPLAIN on
+// the statements the repository runs (ADR-0013).
+export function buildFindByIdQuery(db: Kysely<Database>, id: EventId) {
+  return selectEventRows(db).where("e.id", "=", id);
+}
+
+export function buildListQuery(
+  db: Kysely<Database>,
+  filters: EventFilters,
+  cursor: EventCursor | undefined,
+  limit: number,
+) {
+  let query = selectEventRows(db);
+
+  if (filters.from !== undefined) {
+    query = query.where("e.start_time", ">=", filters.from);
+  }
+  if (filters.to !== undefined) {
+    query = query.where("e.start_time", "<", filters.to);
+  }
+  if (filters.sport !== undefined) {
+    query = query.where("e.sport_code", "=", filters.sport);
+  }
+  if (filters.status !== undefined) {
+    query = query.where("e.status", "=", filters.status);
+  }
+  if (filters.competitorId !== undefined) {
+    // The events of the competitor come from the link table through its
+    // competitor index. A link is home or away, so both sides match.
+    query = query.where(
+      "e.id",
+      "in",
+      db
+        .selectFrom("event_competitors")
+        .select("event_id")
+        .where("competitor_id", "=", filters.competitorId),
+    );
+  }
+  if (cursor !== undefined) {
+    // SQL compares the two pairs like words in a dictionary:
+    // (start_time, id) > (cursor time, cursor ID). The first value decides,
+    // the second breaks a tie. The index stores the same pair in the same
+    // order, so the scan starts at the cursor and reads no earlier row.
+    query = query.where((eb) =>
+      eb(eb.refTuple("e.start_time", "e.id"), ">", eb.tuple(cursor.startsAt, cursor.id)),
+    );
+  }
+
+  // One row more than the page tells whether a next page exists.
+  return query
+    .orderBy("e.start_time")
+    .orderBy("e.id")
+    .limit(limit + 1);
 }
 
 export function createEventRepository(db: Kysely<Database>): EventRepository {
@@ -78,8 +133,18 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
     },
 
     async findById(id) {
-      const row = await selectEventRows(db).where("e.id", "=", id).executeTakeFirst();
+      const row = await buildFindByIdQuery(db, id).executeTakeFirst();
       return row === undefined ? undefined : toEventView(row);
+    },
+
+    async list(filters, cursor, limit) {
+      const rows = await buildListQuery(db, filters, cursor, limit).execute();
+      const views = rows.slice(0, limit).map(toEventView);
+      const last = views.at(-1);
+      if (rows.length <= limit || last === undefined) {
+        return { views };
+      }
+      return { views, nextCursor: { startsAt: last.event.startsAt, id: last.event.id } };
     },
 
     async findCompetitors(ids) {

@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import type { EventCursor, EventFilters, EventRepository } from "../../application/event-repository.ts";
 import { parseCompetitorId, type EventId } from "../../domain/ids.ts";
 import type { Database } from "./database.ts";
@@ -135,6 +135,26 @@ export function createEventRepository(db: Kysely<Database>): EventRepository {
     async findById(id) {
       const row = await buildFindByIdQuery(db, id).executeTakeFirst();
       return row === undefined ? undefined : toEventView(row);
+    },
+
+    async update(event, expectedVersion) {
+      // One statement checks the version and writes. Two writers with the same
+      // expected version cannot both match: the second waits for the first,
+      // then sees the new version and changes no row.
+      const updated = await db
+        .updateTable("events")
+        .set({
+          start_time: event.startsAt,
+          status: event.status,
+          phase: event.phase ?? null,
+          version: event.version,
+          updated_at: sql<Date>`now()`,
+        })
+        .where("id", "=", event.id)
+        .where("version", "=", expectedVersion)
+        .returning("id")
+        .executeTakeFirst();
+      return updated !== undefined;
     },
 
     async list(filters, cursor, limit) {

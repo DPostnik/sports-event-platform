@@ -43,6 +43,11 @@ export interface EventRepository {
 
   findById(id: EventId): Promise<EventView | undefined>;
 
+  // ADR-0030: writes an event that the domain changed, only when the stored
+  // version still equals `expectedVersion`. False means that nothing was
+  // written: another writer was faster, or the event does not exist.
+  update(event: Event, expectedVersion: number): Promise<boolean>;
+
   // ADR-0011, ADR-0012: ordered by start time, then by ID. The caller checks
   // that `limit` is from 1 to 100 (ADR-0029).
   list(filters: EventFilters, cursor: EventCursor | undefined, limit: number): Promise<EventPage>;

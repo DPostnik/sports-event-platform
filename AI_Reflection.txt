@@ -1,0 +1,114 @@
+AI REFLECTION
+
+I used AI tools in every phase of this exercise. This file says where, what I checked myself,
+and one decision where I rejected the AI's proposal. I kept a running log while I worked, so the
+details below come from that log and not from memory.
+
+
+HOW AI TOOLS WERE USED
+----------------------
+
+Requirements. An AI assistant extracted the brief into requirement files with IDs and
+priorities.
+
+Design. I worked out the design in a guided session with an AI assistant. I outlined the request
+flows and the first entities myself. The AI explained options, compared them and made
+recommendations. It advised one service, with the surrounding system described but not built.
+I accepted that.
+
+The AI proposed to take all design decisions up front and write the README from them at the end.
+I rejected that. I started from design v1 and recorded one decision per commit, each as an ADR
+in docs/adr/. The history shows the reasoning in the order it happened.
+
+Implementation. AI coding agents wrote most of the code, tests and documents. They worked under
+the rules in AGENTS.md:
+- an accepted ADR is not changed by code; a change needs a new ADR that I approve;
+- one plan step at a time, in the order of the plan;
+- no feature, endpoint, table or dependency without an ADR or a plan step;
+- an agent reports every place where it chose between alternatives.
+I reviewed every commit. A reviewed step often went in as several focused commits at once, so
+some commits are close together in time.
+
+Independent reviews. After the persistence step, two read-only reviews by a second AI model
+checked the documents, the domain code and the persistence layer. Each finding got a status.
+Several findings led to new ADRs. The finding that the lifecycle rules existed twice, in the
+domain and in SQL, led to ADR-0030. The finding that consumers had no competitor names led to
+ADR-0027. The finding about weak ETags and cache headers led to ADR-0039. The review also found
+factual errors in my ADRs, for example in ADR-0013, and they were fixed.
+
+Tests run against a real PostgreSQL and Redis started through Testcontainers.
+
+
+WHAT I VALIDATED INDEPENDENTLY
+------------------------------
+
+1. Pagination (ADR-0012). The AI said a consumer cannot jump to an arbitrary page with a cursor.
+   I challenged that: with sorted rows the cursor can move by a page distance. I was right. It
+   is possible, at the cost of reading the skipped rows. The AI corrected itself. ADR-0012 lists
+   the bounded-skip variant as a considered alternative, and I chose cursor only.
+
+2. Writes from data providers (ADR-0007, ADR-0009). The AI's concurrency design did not work
+   for providers: a provider that pushes messages cannot know the version stored in the service.
+   I also asked what happens when two providers send versions for the same match. The AI had
+   addressed neither. My two questions produced the single-source rule of ADR-0007. I first
+   described the version check as "greater than or equal". The correct check is equality. I
+   confirmed it after seeing a table of three cases, and ADR-0009 records equality.
+
+3. Sports and competitors (ADR-0003). The AI first proposed a Team entity and a JSON column
+   with sport-specific fields such as halves and periods. Those fields were invented, not taken
+   from the brief or any source. I said the approach looked like reinventing and asked for
+   research on how real providers model it. The AI reviewed five public sources. None had
+   sport-specific fields at schedule level. The AI withdrew the JSON column and proposed a
+   Competitor entity with a link table. I chose the link table because individual and
+   multi-participant sports, such as Olympic events, need it.
+
+4. The live phase (ADR-0004). The AI proposed one optional phase field for live events. I
+   accepted it and pointed out a cost the AI had not mentioned: every consumer must handle
+   sport-specific mappings. Because of my remark, ADR-0004 states a consumer contract. The
+   status is complete on its own, the phase is optional, and unknown values are tolerated.
+
+5. Cache freshness (ADR-0014). The AI proposed a 5-second expiry for one event. That value was
+   an unsupported estimate. I rejected it: events change rarely, so delete on write is the
+   mechanism. I first proposed no expiry. The AI showed a race where a delete is lost, so I
+   kept an expiry only as a safety net, at 60 seconds. I had weighed 5 minutes and judged the
+   saving negligible.
+
+6. Response shape (ADR-0019). The AI first proposed the Warning header, then found it obsolete,
+   then proposed a data/meta envelope with a stale flag. I rejected the envelope, because every
+   consumer would have to handle meta. I asked to check how real sports data providers do it. The
+   check showed a top-level generated_at plus Cache-Control and ETag headers, and no flag. I
+   accepted that shape.
+
+7. Command scope (ADR-0010). The AI proposed six named commands. I asked whether goals, cards
+   and fouls would need commands too, and whether that is this service's job. The outcome:
+   match actions are a separate log in a neighbouring service, out of scope. The AI had not
+   stated that boundary until I asked.
+
+During implementation I reviewed all of the code, commit by commit. For each change I either
+accepted it or asked for improvements. I ran the tests and the type check myself. I discussed edge
+cases with the AI, and they became tests.
+
+
+ONE DECISION WHERE I REJECTED THE AI'S INPUT: FAILURE MODES (ADR-0016)
+-----------------------------------------------------------------------
+
+For the failure modes the AI proposed three rules. Identical requests share one database read,
+always on. The database has a concurrency cap. And reads older than 60 seconds are refused
+while the database is down.
+
+I rejected the third rule on product grounds. An unavailable service is the worse outcome.
+Stale schedule data is better than an error. I asked for stale data to be served, and proposed
+a local cache as well.
+
+The AI changed the design. A cache entry now has two ages: fresh for 60 seconds, kept for 1
+hour. While the database is down, a read is answered from an entry up to 1 hour old. A read
+with no entry, and every write, is refused with 503 UNAVAILABLE. There is no stale flag;
+consumers compare generatedAt with the current time (ADR-0019). ADR-0040 later added the time
+limits and the Retry-After header on every 503.
+
+The decision is tested. test/api/database-outage.test.ts stops PostgreSQL and checks that an
+event and a list are still served at 59, 60 and 3599 seconds, with the Age header set. At 3600
+seconds both reads return 503 UNAVAILABLE. A write returns 503 as well.
+
+Two other inputs I rejected: the JSON details column with invented sport fields (ADR-0003,
+ADR-0004), and the response envelope with a stale flag (ADR-0019).

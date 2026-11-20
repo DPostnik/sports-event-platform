@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { readConfiguration } from "#src/config/environment.ts";
 import { seed } from "#src/infrastructure/persistence/seed.ts";
 import { buildService } from "#src/main.ts";
+import { manualWriter, writerKeyEnvironment } from "#test/api/writer-keys.ts";
 import { startTestDatabase } from "#test/persistence/support/database.ts";
 
 describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
@@ -18,6 +19,7 @@ describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
     onTestFinished(async () => { await redis.stop(); });
     const config = readConfiguration({
       DATABASE_URL: database.connectionString,
+      WRITER_KEYS: writerKeyEnvironment,
       REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
     });
     const writer = await buildService(config, false);
@@ -42,7 +44,7 @@ describe("Single event cache across API instances (ADR-0014, ADR-0015)", () => {
     });
 
     const command = await writer.inject({
-      method: "POST", url: `${url}/start`, payload: { expectedVersion: 1 },
+      method: "POST", url: `${url}/start`, headers: manualWriter.headers, payload: { expectedVersion: 1 },
     });
     expect(command.statusCode).toBe(200);
     const updated = await reader.inject({ url, headers: { "if-none-match": 'W/"1"' } });

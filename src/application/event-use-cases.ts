@@ -30,6 +30,10 @@ export interface EventNotFound {
   readonly id: EventId;
 }
 
+export interface EventForbidden {
+  readonly kind: "EventForbidden";
+}
+
 export class EventUseCases {
   private readonly repository: EventRepository;
   private readonly idGenerator: EventIdGenerator;
@@ -78,10 +82,15 @@ export class EventUseCases {
   async command(
     id: EventId,
     command: Command,
-  ): Promise<Result<EventView, CommandError | EventNotFound>> {
+    writerSource: string,
+  ): Promise<Result<EventView, CommandError | EventNotFound | EventForbidden>> {
     const current = await this.get(id);
     if (!current.ok) {
       return current;
+    }
+
+    if (current.value.event.source !== writerSource) {
+      return err({ kind: "EventForbidden" });
     }
 
     const next = applyCommand(current.value.event, command);

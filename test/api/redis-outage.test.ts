@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readConfiguration } from "#src/config/environment.ts";
 import { seed } from "#src/infrastructure/persistence/seed.ts";
 import { buildService } from "#src/main.ts";
+import { manualWriter, writerKeyEnvironment } from "#test/api/writer-keys.ts";
 import { EVENT_FIELDS } from "#test/domain/fixtures.ts";
 import { startTestDatabase } from "#test/persistence/support/database.ts";
 
@@ -22,6 +23,7 @@ describe("Cache outage (ADR-0016)", () => {
     });
     const app = await buildService(readConfiguration({
       DATABASE_URL: database.connectionString,
+      WRITER_KEYS: writerKeyEnvironment,
       REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
     }), false);
     onTestFinished(() => app.close());
@@ -37,7 +39,7 @@ describe("Cache outage (ADR-0016)", () => {
     redisStopped = true;
 
     const started = await app.inject({
-      method: "POST", url: `${eventUrl}/start`, payload: { expectedVersion: 1 },
+      method: "POST", url: `${eventUrl}/start`, headers: manualWriter.headers, payload: { expectedVersion: 1 },
     });
     expect(started.statusCode, started.body).toBe(200);
     const live = { id: EVENT_FIELDS.id, status: "live", version: 2 };

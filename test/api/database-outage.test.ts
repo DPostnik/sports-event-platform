@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readConfiguration } from "#src/config/environment.ts";
 import { seed } from "#src/infrastructure/persistence/seed.ts";
 import { buildService } from "#src/main.ts";
+import { manualWriter, writerKeyEnvironment } from "#test/api/writer-keys.ts";
 import { EVENT_FIELDS } from "#test/domain/fixtures.ts";
 import { startTestDatabase } from "#test/persistence/support/database.ts";
 
@@ -21,6 +22,7 @@ describe("Cached reads during a database outage (ADR-0016, ADR-0040)", () => {
     onTestFinished(async () => { await redis.stop(); });
     const app = await buildService(readConfiguration({
       DATABASE_URL: database.connectionString,
+      WRITER_KEYS: writerKeyEnvironment,
       REDIS_URL: `redis://${redis.getHost()}:${String(redis.getMappedPort(6379))}`,
     }), false);
     onTestFinished(() => app.close());
@@ -58,7 +60,7 @@ describe("Cached reads during a database outage (ADR-0016, ADR-0040)", () => {
       expect(miss.statusCode).toBe(503);
       expect(miss.json<unknown>()).toMatchObject({ code: "UNAVAILABLE" });
       const write = await app.inject({
-        method: "POST", url: `${eventUrl}/start`, payload: { expectedVersion: 1 },
+        method: "POST", url: `${eventUrl}/start`, headers: manualWriter.headers, payload: { expectedVersion: 1 },
       });
       expect(write.statusCode).toBe(503);
       expect(write.json<unknown>()).toMatchObject({ code: "UNAVAILABLE" });

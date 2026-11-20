@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import swagger from "@fastify/swagger";
-import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest, type onRequestHookHandler } from "fastify";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { Cache } from "#src/application/cache.ts";
@@ -24,6 +24,8 @@ import {
   singleEventErrors,
   transportProblem,
   databaseProblem,
+  writerAuthenticationProblem,
+  writerChallenge,
 } from "#src/http/problems.ts";
 import {
   createBody,
@@ -42,6 +44,7 @@ import {
 
 interface AppOptions {
   readonly events: Pick<EventUseCases, "create" | "get" | "list" | "command">;
+  readonly writerKeys: ReadonlyMap<string, string>;
   readonly clock: Clock;
   readonly cache: Cache | undefined;
   readonly checkReadiness: () => Promise<void>;
@@ -70,9 +73,17 @@ function matchesIfNoneMatch(header: string | undefined, opaqueTag: string): bool
 
 const conditionalHeaders = z.looseObject({ "if-none-match": z.string().optional() });
 const emptyQuery = z.strictObject({});
+const writerSource = Symbol("writerSource");
+const writerSecurity = [{ writerKey: [] }];
+
+function authenticatedSource(request: FastifyRequest): string {
+  const source = request.getDecorator<string | null>(writerSource);
+  if (source === null) throw new Error("Writer route ran without authentication");
+  return source;
+}
 
 export async function buildApp(options: AppOptions) {
-  const { events, clock, cache, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
+  const { events, writerKeys, clock, cache, checkReadiness, databaseFailure, retryAfterSeconds, logger = false } = options;
   const eventReads = new InFlightReads<Result<z.output<typeof eventResponse>, EventNotFound>>();
   const pageReads = new InFlightReads<z.output<typeof listResponse>>();
 
@@ -99,14 +110,33 @@ export async function buildApp(options: AppOptions) {
       handleError(error, request, reply);
     },
   }).withTypeProvider<ZodTypeProvider>();
+  app.decorateRequest(writerSource, null);
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
   app.setErrorHandler(handleError);
   app.setNotFoundHandler((_request, reply) => sendProblem(reply, routeNotFoundProblem()));
 
   await app.register(swagger, {
-    openapi: { openapi: "3.1.0", info: { title: "Sports Events API", version: "1.0.0" } },
-    transform: jsonSchemaTransform,
+    openapi: {
+      openapi: "3.1.0",
+      info: { title: "Sports Events API", version: "1.0.0" },
+      components: { securitySchemes: { writerKey: { type: "http", scheme: "bearer" } } },
+    },
+    transform(document) {
+      const transformed = jsonSchemaTransform(document);
+      const responses = transformed.schema.response;
+      if (typeof responses !== "object" || responses === null || !("401" in responses)) return transformed;
+
+      // The Zod transform converts the response body and drops response headers.
+      const unauthorized = responses["401"];
+      if (typeof unauthorized === "object" && unauthorized !== null) {
+        responses["401"] = {
+          ...unauthorized,
+          headers: { "WWW-Authenticate": { type: "string", const: writerChallenge } },
+        };
+      }
+      return transformed;
+    },
   });
 
   function singleEvent(view: EventView): z.output<typeof eventResponse> {
@@ -144,15 +174,30 @@ export async function buildApp(options: AppOptions) {
     });
   }
 
+  const authenticateWriter: onRequestHookHandler = (request, reply, done) => {
+    const key = /^Bearer +([A-Za-z0-9._~+/-]+=*)$/i.exec(request.headers.authorization ?? "")?.[1];
+    const source = key === undefined
+      ? undefined
+      : writerKeys.get(createHash("sha256").update(key).digest("hex"));
+    if (source === undefined) {
+      sendProblem(reply.header("WWW-Authenticate", writerChallenge), writerAuthenticationProblem());
+      return;
+    }
+    request.setDecorator(writerSource, source);
+    done();
+  };
+
   app.post("/events", {
+    onRequest: authenticateWriter,
     schema: {
+      security: writerSecurity,
       summary: "Create an event or return the stored event for the source identity",
       querystring: emptyQuery,
       body: createBody,
       response: { 200: eventResponse, 201: eventResponse, ...createErrors },
     },
   }, async (request, reply) => {
-    const result = await events.create(request.body);
+    const result = await events.create({ ...request.body, source: authenticatedSource(request) });
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
     const { view, created } = result.value;
     if (created) eventReads.invalidate(`event:${view.event.id}`);
@@ -234,8 +279,8 @@ export async function buildApp(options: AppOptions) {
     return entry.body;
   });
 
-  async function runCommand(id: EventId, command: Command, reply: FastifyReply) {
-    const result = await events.command(id, command);
+  async function runCommand(request: FastifyRequest, id: EventId, command: Command, reply: FastifyReply) {
+    const result = await events.command(id, command, authenticatedSource(request));
     if (!result.ok) return sendProblem(reply, eventProblem(result.error));
     const key = `event:${id}`;
     eventReads.invalidate(key);
@@ -246,12 +291,14 @@ export async function buildApp(options: AppOptions) {
   }
 
   const basicCommandSchema = {
+    security: writerSecurity,
     params: eventParams,
     querystring: emptyQuery,
     body: versionBody,
     response: { 200: eventResponse, ...commandErrors },
   };
   app.post("/events/:id/start", {
+    onRequest: authenticateWriter,
     schema: {
       ...basicCommandSchema,
       summary: "Start a scheduled event",
@@ -260,32 +307,37 @@ export async function buildApp(options: AppOptions) {
     },
   }, (request, reply) => {
     const { expectedVersion, phase } = request.body;
-    return runCommand(request.params.id, {
+    return runCommand(request, request.params.id, {
       kind: "start",
       expectedVersion,
       ...(phase === undefined ? {} : { phase }),
     }, reply);
   });
   app.post("/events/:id/finish", {
+    onRequest: authenticateWriter,
     schema: { ...basicCommandSchema, summary: "Finish a live event" },
-  }, (request, reply) => runCommand(request.params.id, { ...request.body, kind: "finish" }, reply));
+  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "finish" }, reply));
   app.post("/events/:id/postpone", {
+    onRequest: authenticateWriter,
     schema: { ...basicCommandSchema, summary: "Postpone a scheduled event" },
-  }, (request, reply) => runCommand(request.params.id, { ...request.body, kind: "postpone" }, reply));
+  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "postpone" }, reply));
   app.post("/events/:id/reschedule", {
+    onRequest: authenticateWriter,
     schema: { ...basicCommandSchema, summary: "Set a new start time", body: rescheduleBody },
-  }, (request, reply) => runCommand(request.params.id, { ...request.body, kind: "reschedule" }, reply));
+  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "reschedule" }, reply));
   app.post("/events/:id/cancel", {
+    onRequest: authenticateWriter,
     schema: { ...basicCommandSchema, summary: "Cancel a scheduled or postponed event" },
-  }, (request, reply) => runCommand(request.params.id, { ...request.body, kind: "cancel" }, reply));
+  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "cancel" }, reply));
   app.post("/events/:id/phase", {
+    onRequest: authenticateWriter,
     schema: {
       ...basicCommandSchema,
       summary: "Change the phase of a live event",
       body: phaseBody,
       response: { 200: eventResponse, ...phaseCommandErrors },
     },
-  }, (request, reply) => runCommand(request.params.id, { ...request.body, kind: "changePhase" }, reply));
+  }, (request, reply) => runCommand(request, request.params.id, { ...request.body, kind: "changePhase" }, reply));
 
   app.get("/health", {
     schema: {

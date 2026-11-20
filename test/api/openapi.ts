@@ -3,9 +3,11 @@ import { expect } from "vitest";
 import { z } from "zod";
 
 const responseSchema = z.object({
+  headers: z.record(z.string(), z.unknown()).optional(),
   content: z.record(z.string(), z.object({ schema: z.record(z.string(), z.unknown()) })).optional(),
 });
 const operationSchema = z.object({
+  security: z.array(z.record(z.string(), z.array(z.string()))).optional(),
   responses: z.record(z.string(), responseSchema),
 });
 

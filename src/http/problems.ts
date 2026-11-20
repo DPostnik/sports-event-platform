@@ -1,7 +1,7 @@
 import type { FastifyReply } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import { z } from "zod";
-import type { CreateError, EventNotFound } from "#src/application/event-use-cases.ts";
+import type { CreateError, EventForbidden, EventNotFound } from "#src/application/event-use-cases.ts";
 import type { CommandError } from "#src/domain/commands.ts";
 import { EVENT_STATUSES } from "#src/domain/event.ts";
 
@@ -32,6 +32,8 @@ function defineProblem<const Code extends string, const Status extends number, F
 
 const fieldError = z.strictObject({ field: z.string(), message: z.string() });
 const validation = defineProblem("VALIDATION_FAILED", 400, "Validation failed", { errors: z.array(fieldError) });
+const unauthorized = defineProblem("UNAUTHORIZED", 401, "Unauthorized", {});
+const forbidden = defineProblem("FORBIDDEN", 403, "Forbidden", {});
 const notFound = defineProblem("NOT_FOUND", 404, "Not found", {});
 const versionConflict = defineProblem("VERSION_CONFLICT", 409, "Version conflict", { currentVersion: z.int() });
 const transitionNotAllowed = defineProblem("TRANSITION_NOT_ALLOWED", 409, "Transition not allowed", {
@@ -63,12 +65,19 @@ export const singleEventErrors = {
   ...eventErrors,
   404: problemResponse("Event not found", notFound.schema),
 };
+export const writerChallenge = "Bearer";
+const writerErrors = {
+  401: problemResponse("Missing or invalid writer credentials", unauthorized.schema),
+};
 export const createErrors = {
+  ...writerErrors,
   ...eventErrors,
   422: problemResponse("Invalid competitors", z.union([sameCompetitor.schema, sportMismatch.schema, competitorNotFound.schema])),
 };
 export const commandErrors = {
   ...singleEventErrors,
+  ...writerErrors,
+  403: problemResponse("Event belongs to another source", forbidden.schema),
   409: problemResponse("Conflicting event state", z.union([versionConflict.schema, transitionNotAllowed.schema])),
 };
 export const phaseCommandErrors = {
@@ -88,10 +97,12 @@ export function sendProblem(reply: FastifyReply, problem: Problem): FastifyReply
   return reply.code(problem.status).type(mediaType).send(problem);
 }
 
-export function eventProblem(error: CreateError | CommandError | EventNotFound): Problem {
+export function eventProblem(error: CreateError | CommandError | EventNotFound | EventForbidden): Problem {
   switch (error.kind) {
     case "EventNotFound":
       return notFound.body(`Event ${error.id} does not exist.`, {});
+    case "EventForbidden":
+      return forbidden.body("Only the source that owns the event can change it.", {});
     case "VersionConflict":
       return versionConflict.body(
         `Expected version ${String(error.expectedVersion)}, current version is ${String(error.currentVersion)}.`,
@@ -147,6 +158,10 @@ export function databaseProblem(code: "OVERLOADED" | "UNAVAILABLE"): Problem {
 
 export function internalProblem(requestId: string): Problem {
   return internal.body("The service could not complete the request.", { requestId });
+}
+
+export function writerAuthenticationProblem(): Problem {
+  return unauthorized.body("A valid writer bearer key is required.", {});
 }
 
 export function routeNotFoundProblem(): Problem {

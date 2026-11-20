@@ -38,7 +38,7 @@ describe("Handle a command that loses a version-checked write (ADR-0030)", () =>
     const result = await useCases.command(SCHEDULED.event.id, {
       kind: "start",
       expectedVersion: 1,
-    });
+    }, SCHEDULED.event.source);
 
     expect(result).toEqual({
       ok: false,

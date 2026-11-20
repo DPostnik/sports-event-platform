@@ -6,12 +6,12 @@ import { buildService } from "#src/main.ts";
 import { seed } from "#src/infrastructure/persistence/seed.ts";
 import { SALZBURG, STURM, startTestDatabase, type TestDatabase } from "#test/persistence/support/database.ts";
 import { expectDocumentedResponse, openApiSchema, type OpenApi } from "#test/api/openapi.ts";
+import { apiWriter, manualWriter, writerKeyEnvironment } from "#test/api/writer-keys.ts";
 
 const MISSING_ID = "0198c5a0-0000-7000-8000-000000000099";
 const KAC = "0198c5a0-0000-7000-8000-000000000003";
 const CAPITALS = "0198c5a0-0000-7000-8000-000000000004";
 const football = {
-  source: "api-test",
   externalId: "football-salzburg-sturm",
   sport: "football",
   startsAt: "2025-07-18T18:30:00+02:00",
@@ -19,7 +19,6 @@ const football = {
   awayCompetitorId: STURM,
 };
 const hockey = {
-  source: "api-test",
   externalId: "hockey-kac-capitals",
   sport: "ice_hockey",
   startsAt: "2025-10-23T09:45:00+02:00",
@@ -46,7 +45,10 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
   beforeAll(async () => {
     database = await startTestDatabase();
     await seed(database.db);
-    app = await buildService(readConfiguration({ DATABASE_URL: database.connectionString }), false);
+    app = await buildService(readConfiguration({
+      DATABASE_URL: database.connectionString,
+      WRITER_KEYS: writerKeyEnvironment,
+    }), false);
     const response = await app.inject("/openapi.json");
     expect(response.statusCode).toBe(200);
     openApi = openApiSchema.parse(JSON.parse(response.body));
@@ -73,8 +75,11 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     url: string,
     status: number,
     payload?: object,
+    headers = apiWriter.headers,
   ): Promise<unknown> {
-    const response = await runningApp().inject({ method, url, ...(payload === undefined ? {} : { payload }) });
+    const response = await runningApp().inject({
+      method, url, ...(method === "POST" ? { headers } : {}), ...(payload === undefined ? {} : { payload }),
+    });
     expect(response.statusCode, response.body).toBe(status);
     await expectDocumentedResponse(openApi, method, path, response);
     return JSON.parse(response.body);
@@ -96,13 +101,68 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     { payload: hockey, startsAt: "2025-10-23T07:45:00.000Z", home: "KAC", away: "Capitals" },
   ])("stores and reads the $payload.sport example with UTC time and competitor names", async ({ payload, startsAt, home, away }) => {
     const created = eventBodySchema.parse(await request("POST", "/events", "/events", 201, payload));
-    expect(created.event).toMatchObject({ startsAt, status: "scheduled", version: 1 });
+    expect(created.event).toMatchObject({ startsAt, status: "scheduled", version: 1, source: apiWriter.source });
     const retrieved = await request("GET", "/events/{id}", `/events/${created.event.id}`, 200);
     expect(retrieved).toMatchObject({ event: created.event });
     expect(created.event.competitors).toMatchObject([
       { name: home, role: "home" },
       { name: away, role: "away" },
     ]);
+  });
+
+  describe("Writer credentials and ownership (ADR-0042)", () => {
+    test("all writes challenge missing, malformed or unknown credentials", async () => {
+      const writePaths = [
+        "/events", "/events/{id}/start", "/events/{id}/finish", "/events/{id}/postpone",
+        "/events/{id}/reschedule", "/events/{id}/cancel", "/events/{id}/phase",
+      ];
+      expect(openApi.components.securitySchemes).toMatchObject({ writerKey: { type: "http", scheme: "bearer" } });
+      for (const path of writePaths) {
+        expect(openApi.paths[path]?.post?.security).toEqual([{ writerKey: [] }]);
+        expect(openApi.paths[path]?.post?.responses["401"]?.headers).toHaveProperty("WWW-Authenticate");
+        for (const headers of [{}, { authorization: "Basic unknown" }, { authorization: "Bearer unknown" }]) {
+          const response = await runningApp().inject({
+            method: "POST",
+            url: path.replace("{id}", MISSING_ID),
+            headers,
+            payload: {},
+          });
+          expect(response.statusCode).toBe(401);
+          expect(response.headers["www-authenticate"]).toBe("Bearer");
+          expect(response.json<unknown>()).toMatchObject({ code: "UNAUTHORIZED" });
+          await expectDocumentedResponse(openApi, "POST", path, response);
+        }
+      }
+    });
+
+    test("rejects source in the create body", async () => {
+      expect(await request("POST", "/events", "/events", 400, { ...football, source: "manual" }))
+        .toMatchObject({ code: "VALIDATION_FAILED", errors: [{ field: "source" }] });
+    });
+
+    test("different authenticated sources can create events with the same external ID", async () => {
+      const payload = { ...football, externalId: "shared", startsAt: "2031-07-18T18:30:00Z" };
+      const first = eventBodySchema.parse(await request("POST", "/events", "/events", 201, payload)).event;
+      const second = eventBodySchema.parse(await request(
+        "POST", "/events", "/events", 201, payload, manualWriter.headers,
+      )).event;
+      expect(first).toMatchObject({ source: apiWriter.source });
+      expect(second).toMatchObject({ source: manualWriter.source });
+      expect(second.id).not.toBe(first.id);
+    });
+
+    test("refuses a foreign command before checking its version and lifecycle", async () => {
+      const { id } = await create("foreign-command");
+      expect(await request(
+        "POST", "/events/{id}/finish", `/events/${id}/finish`, 403, { expectedVersion: 99 }, manualWriter.headers,
+      )).toMatchObject({ code: "FORBIDDEN" });
+    });
+
+    test("keeps the read operations public in OpenAPI", () => {
+      for (const path of ["/events", "/events/{id}", "/health", "/ready"]) {
+        expect(openApi.paths[path]?.get?.security).toBeUndefined();
+      }
+    });
   });
 
   test("revalidates a single event against its current version (ADR-0039)", async () => {
@@ -232,6 +292,7 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     const sendStart = () => runningApp().inject({
       method: "POST",
       url: `/events/${id}/start`,
+      headers: apiWriter.headers,
       payload: { expectedVersion: 1 },
     });
     const outcomes = await Promise.all([sendStart(), sendStart()]);

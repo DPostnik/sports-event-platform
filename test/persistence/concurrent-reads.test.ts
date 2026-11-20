@@ -23,6 +23,7 @@ describe("Concurrent reads without a shared cache (ADR-0016)", () => {
     });
     const app = await buildApp({
       events: new EventUseCases(createEventRepository(db), { next: () => EVENT_FIELDS.id }),
+      writerKeys: new Map(),
       cache: undefined,
       clock: { now: () => new Date() },
       checkReadiness: () => Promise.resolve(),

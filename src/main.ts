@@ -35,6 +35,7 @@ export async function buildService(config: Configuration, logger = true) {
   try {
     const app = await buildApp({
       events,
+      writerKeys: config.writerKeys,
       cache: redis && createRedisCache(redis),
       clock: { now: () => new Date() },
       checkReadiness: async () => {

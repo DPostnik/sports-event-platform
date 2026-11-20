@@ -19,7 +19,6 @@ const competitorId = uuid.transform((value, context) => {
   return z.NEVER;
 });
 
-const source = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/);
 const sport = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
 const externalId = z.string().min(1).max(128).refine((value) => !value.includes("\0"), {
   message: "The external ID must not contain a null character",
@@ -39,7 +38,6 @@ const instant = z.iso.datetime({ offset: true })
 
 export const eventParams = z.strictObject({ id: eventId });
 export const createBody = z.strictObject({
-  source,
   externalId,
   sport,
   startsAt: instant,

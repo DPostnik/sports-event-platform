@@ -103,12 +103,23 @@ export async function buildApp(options: AppOptions) {
     return { generatedAt: clock.now().toISOString(), event: toEventResponse(view) };
   }
 
-  async function readCachedEvent(key: string, id: EventId) {
-    const raw = await cache?.get(key);
-    if (raw === undefined) return undefined;
-    const body = eventResponse.parse(JSON.parse(raw));
-    const age = Math.floor((clock.now().getTime() - Date.parse(body.generatedAt)) / 1000);
-    return body.event.id === id && age >= 0 && age < 60 ? { body, age } : undefined;
+  async function readCached<T extends { generatedAt: string }>(key: string, schema: z.ZodType<T>, request: FastifyRequest) {
+    try {
+      const raw = await cache?.get(key);
+      if (raw === undefined) return undefined;
+      const body = schema.parse(JSON.parse(raw));
+      const age = Math.floor((clock.now().getTime() - Date.parse(body.generatedAt)) / 1000);
+      return age >= 0 && age < 60 ? { body, age } : undefined;
+    } catch (err) {
+      request.log.warn({ err }, "Failed to read cached response");
+      return undefined;
+    }
+  }
+
+  async function cacheResponse(key: string, body: unknown, request: FastifyRequest) {
+    await cache?.set(key, JSON.stringify(body), 3600).catch((err: unknown) => {
+      request.log.warn({ err }, "Failed to cache response");
+    });
   }
 
   app.post("/events", {
@@ -136,17 +147,12 @@ export async function buildApp(options: AppOptions) {
   }, async (request, reply) => {
     const id = request.params.id;
     const key = `event:${id}`;
-    let entry = await readCachedEvent(key, id).catch((err: unknown) => {
-      request.log.warn({ err }, "Failed to read cached event");
-      return undefined;
-    });
-    if (!entry) {
+    let entry = await readCached(key, eventResponse, request);
+    if (entry?.body.event.id !== id) {
       const result = await events.get(id);
       if (!result.ok) return sendProblem(reply, eventProblem(result.error));
       const body = singleEvent(result.value);
-      await cache?.set(key, JSON.stringify(body), 3600).catch((err: unknown) => {
-        request.log.warn({ err }, "Failed to cache event");
-      });
+      await cacheResponse(key, body, request);
       entry = { body, age: 0 };
     }
     const opaqueTag = `"${String(entry.body.event.version)}"`;
@@ -163,8 +169,14 @@ export async function buildApp(options: AppOptions) {
       querystring: listQuery,
       response: { 200: listResponse, ...eventErrors },
     },
-  }, async (request) => {
+  }, async (request, reply) => {
     const { sport, status, from, to, competitor, cursor, limit = 50 } = request.query;
+    const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
+    const cached = await readCached(key, listResponse, request);
+    if (cached) {
+      reply.header("Cache-Control", "max-age=60").header("Age", String(cached.age));
+      return cached.body;
+    }
     const page = await events.list({
       ...(sport === undefined ? {} : { sport }),
       ...(status === undefined ? {} : { status }),
@@ -172,11 +184,14 @@ export async function buildApp(options: AppOptions) {
       ...(to === undefined ? {} : { to }),
       ...(competitor === undefined ? {} : { competitorId: competitor }),
     }, cursor, limit);
-    return {
+    const body = {
       generatedAt: clock.now().toISOString(),
       events: page.views.map(toEventResponse),
       nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
     };
+    await cacheResponse(key, body, request);
+    reply.header("Cache-Control", "max-age=60").header("Age", "0");
+    return body;
   });
 
   async function runCommand(id: EventId, command: Command, reply: FastifyReply) {

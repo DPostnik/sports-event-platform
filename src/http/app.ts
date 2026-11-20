@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import swagger from "@fastify/swagger";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler, type ZodTypeProvider } from "fastify-type-provider-zod";
@@ -32,6 +33,7 @@ import {
   phaseBody,
   rescheduleBody,
   startBody,
+  toEventFilters,
   toEventResponse,
   versionBody,
 } from "#src/http/schemas.ts";
@@ -62,6 +64,7 @@ function matchesIfNoneMatch(header: string | undefined, opaqueTag: string): bool
   return matched;
 }
 
+const conditionalHeaders = z.looseObject({ "if-none-match": z.string().optional() });
 const emptyQuery = z.strictObject({});
 
 export async function buildApp(options: AppOptions) {
@@ -141,7 +144,7 @@ export async function buildApp(options: AppOptions) {
       summary: "Get an event",
       params: eventParams,
       querystring: emptyQuery,
-      headers: z.looseObject({ "if-none-match": z.string().optional() }),
+      headers: conditionalHeaders,
       response: { 200: eventResponse, 304: z.null().describe("Event version unchanged"), ...singleEventErrors },
     },
   }, async (request, reply) => {
@@ -167,31 +170,32 @@ export async function buildApp(options: AppOptions) {
     schema: {
       summary: "List events by start time and ID",
       querystring: listQuery,
-      response: { 200: listResponse, ...eventErrors },
+      headers: conditionalHeaders,
+      response: { 200: listResponse, 304: z.null().describe("List page unchanged"), ...eventErrors },
     },
   }, async (request, reply) => {
     const { sport, status, from, to, competitor, cursor, limit = 50 } = request.query;
     const key = `events:${JSON.stringify({ sport, status, from, to, competitor, cursor, limit })}`;
-    const cached = await readCached(key, listResponse, request);
-    if (cached) {
-      reply.header("Cache-Control", "max-age=60").header("Age", String(cached.age));
-      return cached.body;
+    let entry = await readCached(key, listResponse, request);
+    if (!entry) {
+      const page = await events.list(toEventFilters(request.query), cursor, limit);
+      const body = {
+        generatedAt: clock.now().toISOString(),
+        events: page.views.map(toEventResponse),
+        nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
+      };
+      await cacheResponse(key, body, request);
+      entry = { body, age: 0 };
     }
-    const page = await events.list({
-      ...(sport === undefined ? {} : { sport }),
-      ...(status === undefined ? {} : { status }),
-      ...(from === undefined ? {} : { from }),
-      ...(to === undefined ? {} : { to }),
-      ...(competitor === undefined ? {} : { competitorId: competitor }),
-    }, cursor, limit);
-    const body = {
-      generatedAt: clock.now().toISOString(),
-      events: page.views.map(toEventResponse),
-      nextCursor: page.nextCursor === undefined ? undefined : encodeCursor(page.nextCursor),
-    };
-    await cacheResponse(key, body, request);
-    reply.header("Cache-Control", "max-age=60").header("Age", "0");
-    return body;
+    const { events: items, nextCursor } = entry.body;
+    const versions = items.map(({ id, version }) => [id, version]);
+    const hash = createHash("sha256").update(JSON.stringify([versions, nextCursor])).digest("base64url");
+    const opaqueTag = `"${hash}"`;
+    reply.header("ETag", `W/${opaqueTag}`).header("Cache-Control", "max-age=60").header("Age", String(entry.age));
+    if (matchesIfNoneMatch(request.headers["if-none-match"], opaqueTag)) {
+      return reply.code(304).send(null);
+    }
+    return entry.body;
   });
 
   async function runCommand(id: EventId, command: Command, reply: FastifyReply) {

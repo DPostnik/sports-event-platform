@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { z } from "zod";
-import type { EventCursor } from "#src/application/event-repository.ts";
+import type { EventCursor, EventFilters } from "#src/application/event-repository.ts";
 import type { EventView } from "#src/application/event-view.ts";
 import { EVENT_STATUSES } from "#src/domain/event.ts";
 import { parseCompetitorId, parseEventId } from "#src/domain/ids.ts";
@@ -76,6 +76,16 @@ export const listQuery = z.strictObject({
   limit: z.string().regex(/^(?:[1-9][0-9]?|100)$/).transform(Number)
     .describe("An integer from 1 to 100. Default is 50.").optional(),
 });
+
+export function toEventFilters({ sport, status, from, to, competitor }: z.output<typeof listQuery>): EventFilters {
+  return {
+    ...(sport === undefined ? {} : { sport }),
+    ...(status === undefined ? {} : { status }),
+    ...(from === undefined ? {} : { from }),
+    ...(to === undefined ? {} : { to }),
+    ...(competitor === undefined ? {} : { competitorId: competitor }),
+  };
+}
 
 const utc = z.iso.datetime();
 const competitor = z.strictObject({

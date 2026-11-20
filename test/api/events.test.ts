@@ -123,6 +123,35 @@ describe("Event routes and responses - API-1, API-2, API-3, API-4, API-7, API-9,
     expect(changed.headers.etag).toBe('W/"2"');
   });
 
+  test("revalidates a list page by event versions and its next cursor (ADR-0039)", async () => {
+    const url = "/events?from=2030-01-01T00:00:00Z&to=2030-01-02T00:00:00Z&limit=1";
+    const firstEvent = eventBodySchema.parse(await request("POST", "/events", "/events", 201, {
+      ...football, externalId: "etag-first", startsAt: "2030-01-01T10:00:00Z",
+    })).event;
+    const first = await runningApp().inject(url);
+    const tag = z.string().startsWith('W/"').parse(first.headers.etag);
+    const headers = { "if-none-match": tag };
+    const unchanged = await runningApp().inject({ url, headers });
+    expect(unchanged.statusCode).toBe(304);
+    expect(unchanged.body).toBe("");
+    expect(unchanged.headers).toMatchObject({ etag: tag, "cache-control": "max-age=60", age: "0" });
+
+    // Only nextCursor changes on the first page when a second page appears.
+    await request("POST", "/events", "/events", 201, {
+      ...football, externalId: "etag-second", startsAt: "2030-01-01T11:00:00Z",
+    });
+    const paged = await runningApp().inject({ url, headers });
+    expect(paged.statusCode).toBe(200);
+    expect(paged.json<unknown>()).toMatchObject({ events: [firstEvent] });
+    const pageTag = z.string().parse(paged.headers.etag);
+    expect(pageTag).not.toBe(tag);
+
+    await command(firstEvent.id, "start", 200, { expectedVersion: 1 });
+    const updated = await runningApp().inject({ url, headers: { "if-none-match": pageTag } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.headers.etag).not.toBe(pageTag);
+  });
+
   test("repeats return the stored event when the new payload differs (ADR-0038)", async () => {
     const event = await create("repeat");
     const repeated = await request("POST", "/events", "/events", 200, {

@@ -50,7 +50,7 @@ Import rules, enforced by the linter:
 
 ## Persistence
 
-- Schema changes are migrations. Constraints and indexes are explicit SQL with a comment that names the ADR.
+- Schema changes are migrations. Constraints and indexes are explicit SQL with a name. The reasons are in the ADRs and the README, not in comments.
 - A change to an existing event is read, decided by the domain, and written by one statement that is conditional on the version (ADR-0009, ADR-0030). The SQL does not repeat lifecycle rules.
 - Each use case that writes runs in one explicit transaction.
 - Rows are checked in the mapper with the domain constructors before they become domain objects (ADR-0034). No Zod in the persistence layer.

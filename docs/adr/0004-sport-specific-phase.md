@@ -8,7 +8,7 @@ Date: 2026-11-19
 
 Sports differ. Football has halves, ice hockey has periods, tennis has sets. [ADR-0003](0003-sports-and-competitors.md) left open where such differences live.
 
-The public APIs reviewed in ADR-0003 keep the schedule-level event identical across sports. They put sport-specific detail into a second, detailed match status next to the generic one. Sportradar exposes both `status` and `match_status`.
+The public APIs reviewed in ADR-0003 keep the schedule-level event identical across sports. They put sport-specific detail into a second, detailed match status next to the generic one. One provider exposes both `status` and `match_status`.
 
 A further concern: every sport-specific value becomes something each consumer must map and handle.
 

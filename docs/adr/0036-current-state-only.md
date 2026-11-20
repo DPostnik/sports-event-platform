@@ -29,7 +29,7 @@ A common alternative model gives each status its own data: `started_at` on a liv
 - "When did this service last change the row" is this service's own fact. The `updated_at` column holds it. It is internal and is not part of the API.
 - Earlier values and the time of each transition belong to the change events of [ADR-0020](0020-change-propagation.md). Each outbox row records one change and its time. Described, not built.
 - A cancellation reason is free text from a producer. It is a case of the metadata extension that the brief names, not part of the lifecycle.
-- A possible extension inside this scope is a flag that the scheduled start is confirmed. Sportradar's API has `start_time_confirmed` on a sport event. Its timeline endpoint lists `match_started` and `match_ended` as timeline entries, apart from the sport event itself ([UOF timeline endpoint](https://docs.sportradar.com/uof/support-and-history/archive/deprecated-uof-endpoints/timeline-end-point)). Not built.
+- A possible extension inside this scope is a flag that the scheduled start is confirmed. One provider's public API has `start_time_confirmed` on a sport event. Its timeline endpoint lists `match_started` and `match_ended` as timeline entries, apart from the sport event itself. Not built.
 
 ## Alternatives considered
 

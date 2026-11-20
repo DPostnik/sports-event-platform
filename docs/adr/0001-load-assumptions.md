@@ -14,7 +14,7 @@ The service is sized for these values.
 
 | Parameter | Value | Basis |
 | --------- | ----- | ----- |
-| New events per year | 400,000 to 1,000,000; sized for 1,000,000 | Lower figure was mentioned for the Sports Media product during the interview process; upper figure is Sportradar's public company-wide number |
+| New events per year | 400,000 to 1,000,000; sized for 1,000,000 | Lower figure: an estimate for one sports media product. Upper figure: the public company-wide number of a large sports data provider |
 | New events per day | about 2,700 on average, up to 10,000 on a peak day | Derived; peak on weekends (estimate) |
 | Rows after 5 years | about 5 million | Derived |
 | Writes per event over its life | 5 to 10 (create, reschedule, start, finish, corrections) | Estimate |
@@ -22,10 +22,10 @@ The service is sized for these values.
 | Write rate, peak | 50 to 100 per second | Estimate: bulk schedule import |
 | Read rate, average | 2,400 requests per second | Estimate: 24,000 concurrent viewers polling every 10 seconds |
 | Read rate, peak | 10,000 to 12,000 requests per second | Estimate: factor 5 on a major tournament day |
-| Acceptable staleness, lists | up to 60 seconds | The interview process described this data as refreshed within minutes, not at betting latency |
+| Acceptable staleness, lists | up to 60 seconds | Assumption: schedule data for media consumers is refreshed within minutes, not at betting latency |
 | Acceptable staleness, single event | up to 5 seconds | Estimate. Later replaced by [ADR-0014](0014-cache-freshness.md) |
 
-Values marked as estimates are the author's assumptions, not Sportradar data. Real traffic figures are not public. The direct consumers are likely backend systems of media companies that cache on their side, so real load may be lower and burstier.
+Values marked as estimates are the author's assumptions, not provider data. Real traffic figures are not public. The direct consumers are likely backend systems of media companies that cache on their side, so real load may be lower and burstier.
 
 ## Alternatives considered
 

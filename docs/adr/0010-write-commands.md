@@ -36,7 +36,7 @@ Match actions are not part of this service. Goals, cards, fouls, substitutions a
 | Change rate | A few times in the life of an event | Hundreds of times per match |
 | Stored as | Current state, one row per event | An append-only log, one row per action |
 
-A match action does not change the status or the start time of an event. If it were built, it would be a separate log with one "append action" operation and a type field, not more commands on the event. Public provider APIs separate these too: Sportradar exposes the schedule and summary of a sport event apart from its timeline and statistics.
+A match action does not change the status or the start time of an event. If it were built, it would be a separate log with one "append action" operation and a type field, not more commands on the event. Public provider APIs separate these too: one large provider exposes the schedule and summary of a sport event apart from its timeline and statistics.
 
 ## Alternatives considered
 

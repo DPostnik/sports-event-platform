@@ -8,7 +8,7 @@ Date: 2026-11-19
 
 Design v1 named Match and Team without fields. The brief asks to anticipate additional sports. Not every sport has two teams: tennis has two individuals, and a race has many individual participants.
 
-Public sports data APIs were reviewed for a common shape: Sportradar ([Soccer sport event summary](https://developer.sportradar.com/soccer/reference/soccer-sport-event-summary), [UOF sport_event](https://docs.sportradar.com/uof/api-and-structure/api/elements/less-than-sport_event-greater-than)), [SportsDataIO Global API](https://sportsdata.io/developers/workflow-guide/global), [Sportmonks v3](https://docs.sportmonks.com/v3/tutorials-and-guides/tutorials/api-structure-and-navigation), the undocumented ESPN site API as described by third parties, and [IPTC Sport Schema](https://github.com/iptc/sport-schema). They share one pattern: a sport-independent event core, the sport as a referenced entity, and participants as a list with a home/away marker. These are public API shapes, not internal database schemas.
+Public sports data APIs were reviewed for a common shape: the soccer API and the odds feed of one large commercial provider, [SportsDataIO Global API](https://sportsdata.io/developers/workflow-guide/global), [Sportmonks v3](https://docs.sportmonks.com/v3/tutorials-and-guides/tutorials/api-structure-and-navigation), the undocumented ESPN site API as described by third parties, and [IPTC Sport Schema](https://github.com/iptc/sport-schema). They share one pattern: a sport-independent event core, the sport as a referenced entity, and participants as a list with a home/away marker. These are public API shapes, not internal database schemas.
 
 ## Decision
 
@@ -31,7 +31,7 @@ erDiagram
 
 - A sport is identified by a stable code (for example `football`, `ice_hockey`). The display name can change. Adding a sport is a data change, not a release.
 - The entity is named Competitor, not Team: it is a team or an individual. A competitor belongs to exactly one sport.
-- The role column holds `home` or `away` for two-sided matches. Sportradar's API calls this marker `qualifier`.
+- The role column holds `home` or `away` for two-sided matches. One provider's API calls this marker `qualifier`.
 
 Example for the brief's event "2025-07-18 18:30 - Football - Salzburg vs. Sturm". The IDs are placeholders; the ID format is open question 4.
 

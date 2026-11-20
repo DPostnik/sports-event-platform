@@ -8,7 +8,7 @@ Date: 2026-11-19
 
 [ADR-0016](0016-failure-modes.md) serves cached data up to 1 hour old while the database is down and says the consumer must be able to tell. The first proposal wrapped every response in `data` and `meta` with a `stale` flag. That forces every consumer to unwrap the envelope and to handle the flag.
 
-Public provider APIs were checked. Sportradar puts one timestamp, `generated_at`, at the top of the payload and states the cache lifetime in the `Cache-Control` header (`max-age`); some feeds also carry `ETag`. Sportmonks uses an envelope (`data` with `pagination` and `rate_limit`) but no stale flag. The HTTP `Warning` header, once used to mark stale responses, was obsoleted by RFC 9111.
+Public provider APIs were checked. One large provider puts one timestamp, `generated_at`, at the top of the payload and states the cache lifetime in the `Cache-Control` header (`max-age`); some feeds also carry `ETag`. Sportmonks uses an envelope (`data` with `pagination` and `rate_limit`) but no stale flag. The HTTP `Warning` header, once used to mark stale responses, was obsoleted by RFC 9111.
 
 ## Decision
 
@@ -61,4 +61,4 @@ Freshness is stated with standard HTTP headers.
 - CDNs and consumer-side HTTP caches can cache GET responses without custom rules. This lowers load before it reaches the service.
 - Polling with `If-None-Match` is cheap: an unchanged answer costs no body.
 - A CDN can serve a response for up to 60 seconds after a delete on write. The "at once" of [ADR-0014](0014-cache-freshness.md) holds for requests that reach the service, not for copies held by caches in front of it.
-- `generatedAt` and the header names follow what Sportradar's own APIs do, so the shape is familiar to their consumers.
+- `generatedAt` and the header names follow what a large provider's public APIs do, so the shape is familiar to consumers of such feeds.

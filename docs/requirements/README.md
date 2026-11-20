@@ -1,6 +1,6 @@
 # Requirements - Sports Event Platform
 
-This folder turns the Sportradar engineering exercise brief into concrete, checkable requirements.
+This folder turns the engineering exercise brief into concrete, checkable requirements.
 The original brief is not included in this repository (it is copyrighted).
 
 ## Goal

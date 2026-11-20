@@ -1,6 +1,6 @@
-import type { EventView } from "../../application/event-view.ts";
-import { EVENT_STATUSES, type Event, type EventStatus } from "../../domain/event.ts";
-import { parseCompetitorId, parseEventId } from "../../domain/ids.ts";
+import type { EventView } from "#src/application/event-view.ts";
+import { EVENT_STATUSES, type Event, type EventStatus } from "#src/domain/event.ts";
+import { parseCompetitorId, parseEventId } from "#src/domain/ids.ts";
 
 // What every read statement returns: one event joined with its sport and its
 // two competitors.

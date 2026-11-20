@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyCommand, type Command, type CommandKind } from "../../src/domain/commands.ts";
-import { EVENT_STATUSES, type Event, type EventStatus } from "../../src/domain/event.ts";
-import { EVENT_FIELDS } from "./fixtures.ts";
+import { applyCommand, type Command, type CommandKind } from "#src/domain/commands.ts";
+import { EVENT_STATUSES, type Event, type EventStatus } from "#src/domain/event.ts";
+import { EVENT_FIELDS } from "#test/domain/fixtures.ts";
 
 const NEW_START = new Date("2025-07-19T16:30:00Z");
 

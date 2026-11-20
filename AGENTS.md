@@ -39,6 +39,8 @@ Import rules, enforced by the linter:
 
 `infrastructure` and `http` never import each other.
 
+Project files are imported by the full path from the project root: `#src/...` and `#test/...`. Relative imports are not used. The `imports` field of `package.json` maps the two prefixes to the folders.
+
 ## TypeScript
 
 - Strict settings stay on: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`.

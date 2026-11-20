@@ -1,4 +1,4 @@
-import type { CompetitorId, EventId } from "./ids.ts";
+import type { CompetitorId, EventId } from "#src/domain/ids.ts";
 
 // ADR-0002. The list exists at run time for the row mapper and the HTTP schema.
 export const EVENT_STATUSES = ["scheduled", "live", "postponed", "finished", "cancelled"] as const;

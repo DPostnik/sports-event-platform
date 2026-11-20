@@ -1,8 +1,8 @@
 import { sql, type Kysely } from "kysely";
-import type { EventCursor, EventFilters, EventRepository } from "../../application/event-repository.ts";
-import { parseCompetitorId, type EventId } from "../../domain/ids.ts";
-import type { Database } from "./database.ts";
-import { CorruptRowError, toEventView } from "./mapper.ts";
+import type { EventCursor, EventFilters, EventRepository } from "#src/application/event-repository.ts";
+import { parseCompetitorId, type EventId } from "#src/domain/ids.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { CorruptRowError, toEventView } from "#src/infrastructure/persistence/mapper.ts";
 
 // One event with its sport and both competitors in one statement, so a list
 // never runs one query per event (ADR-0011). An event has exactly one home

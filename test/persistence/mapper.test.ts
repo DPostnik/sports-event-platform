@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CorruptRowError, toEventView, type EventRow } from "../../src/infrastructure/persistence/mapper.ts";
+import { CorruptRowError, toEventView, type EventRow } from "#src/infrastructure/persistence/mapper.ts";
 
 const ROW: EventRow = {
   id: "0198c5a0-7b1e-7d3a-9c4e-2f6a8b1d5e90",

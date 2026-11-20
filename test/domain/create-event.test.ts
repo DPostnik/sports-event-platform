@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createEvent, type NewEvent } from "../../src/domain/create-event.ts";
-import { EVENT_FIELDS, SALZBURG, STURM } from "./fixtures.ts";
+import { createEvent, type NewEvent } from "#src/domain/create-event.ts";
+import { EVENT_FIELDS, SALZBURG, STURM } from "#test/domain/fixtures.ts";
 
 const newEvent: NewEvent = {
   id: EVENT_FIELDS.id,

@@ -1,8 +1,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { applyCommand, type Command, type CommandKind } from "../../src/domain/commands.ts";
-import type { Event, EventStatus } from "../../src/domain/event.ts";
-import { EVENT_FIELDS } from "./fixtures.ts";
+import { applyCommand, type Command, type CommandKind } from "#src/domain/commands.ts";
+import type { Event, EventStatus } from "#src/domain/event.ts";
+import { EVENT_FIELDS } from "#test/domain/fixtures.ts";
 
 // ADR-0026: properties that hold for any sequence of commands. fast-check
 // generates the sequences and reports the shortest one that breaks a property.

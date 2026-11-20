@@ -1,8 +1,8 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { sql, type Kysely } from "kysely";
-import { createDatabase } from "../../../src/infrastructure/persistence/connection.ts";
-import type { Database } from "../../../src/infrastructure/persistence/database.ts";
-import { migrateToLatest } from "../../../src/infrastructure/persistence/migrate.ts";
+import { createDatabase } from "#src/infrastructure/persistence/connection.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { migrateToLatest } from "#src/infrastructure/persistence/migrate.ts";
 
 export interface TestDatabase {
   readonly db: Kysely<Database>;

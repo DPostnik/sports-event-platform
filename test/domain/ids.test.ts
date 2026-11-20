@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCompetitorId, parseEventId, type EventId } from "../../src/domain/ids.ts";
+import { parseCompetitorId, parseEventId, type EventId } from "#src/domain/ids.ts";
 
 const UUID = "0198c5a0-7b1e-7d3a-9c4e-2f6a8b1d5e90";
 

@@ -1,6 +1,6 @@
 import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
-import type { Database } from "./database.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
 
 // The one place that opens a connection pool. `db.destroy()` closes it.
 export function createDatabase(connectionString: string): Kysely<Database> {

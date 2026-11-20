@@ -1,7 +1,7 @@
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Database } from "../../src/infrastructure/persistence/database.ts";
-import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "./support/database.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "#test/persistence/support/database.ts";
 
 // PER-2: the database rejects bad data by itself. Each test writes one bad
 // row with plain SQL and names the constraint that must refuse it.

@@ -1,11 +1,11 @@
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { EventCursor, EventFilters, EventRepository } from "../../src/application/event-repository.ts";
-import type { Event, EventStatus } from "../../src/domain/event.ts";
-import type { Database } from "../../src/infrastructure/persistence/database.ts";
-import { createEventRepository } from "../../src/infrastructure/persistence/event-repository.ts";
-import { competitorId, eventId } from "../domain/fixtures.ts";
-import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "./support/database.ts";
+import type { EventCursor, EventFilters, EventRepository } from "#src/application/event-repository.ts";
+import type { Event, EventStatus } from "#src/domain/event.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
+import { competitorId, eventId } from "#test/domain/fixtures.ts";
+import { resetData, SALZBURG, startTestDatabase, STURM, type TestDatabase } from "#test/persistence/support/database.ts";
 
 const KAC = "0198c5a0-0000-7000-8000-000000000003";
 const CAPITALS = "0198c5a0-0000-7000-8000-000000000004";

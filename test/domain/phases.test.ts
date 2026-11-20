@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPhaseOfSport } from "../../src/domain/phases.ts";
+import { isPhaseOfSport } from "#src/domain/phases.ts";
 
 describe("Phases per sport (ADR-0004, ADR-0031)", () => {
   it("accepts a phase of the sport", () => {

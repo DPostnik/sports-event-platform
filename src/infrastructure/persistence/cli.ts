@@ -1,6 +1,6 @@
-import { createDatabase } from "./connection.ts";
-import { migrateToLatest } from "./migrate.ts";
-import { seed } from "./seed.ts";
+import { createDatabase } from "#src/infrastructure/persistence/connection.ts";
+import { migrateToLatest } from "#src/infrastructure/persistence/migrate.ts";
+import { seed } from "#src/infrastructure/persistence/seed.ts";
 
 // Entry point of `npm run migrate` and `npm run seed`.
 const command = process.argv[2];

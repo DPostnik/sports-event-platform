@@ -1,6 +1,6 @@
-import type { Event } from "./event.ts";
-import type { CompetitorId, EventId } from "./ids.ts";
-import { err, ok, type Result } from "./result.ts";
+import type { Event } from "#src/domain/event.ts";
+import type { CompetitorId, EventId } from "#src/domain/ids.ts";
+import { err, ok, type Result } from "#src/domain/result.ts";
 
 // What the domain needs to know about a competitor to check a new event.
 export interface Competitor {

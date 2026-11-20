@@ -9,7 +9,14 @@ const FORBIDDEN_IMPORTS = {
   http: ["infrastructure", "config"],
 };
 
-// Patterns match relative paths, so they work without path aliases.
+// Project files are imported by the full path from the project root:
+// "#src/..." or "#test/...". The "imports" field of package.json maps the two
+// prefixes to the folders, and Node.js, TypeScript and Vitest all read it.
+const NO_RELATIVE_IMPORTS = {
+  regex: "^\\.",
+  message: "Import project files as #src/... or #test/..., not by a relative path.",
+};
+
 const layerRule = (layer, forbidden) => ({
   files: [`src/${layer}/**/*.ts`],
   rules: {
@@ -17,14 +24,15 @@ const layerRule = (layer, forbidden) => ({
       "error",
       {
         patterns: [
+          NO_RELATIVE_IMPORTS,
           ...forbidden.map((other) => ({
-            group: [`**/${other}`, `**/${other}/**`],
+            regex: `^#src/${other}/`,
             message: `${layer} must not import from ${other} (AGENTS.md layer rules).`,
           })),
-          { group: ["**/main", "**/main.*"], message: `${layer} must not import the composition root.` },
+          { regex: "^#src/main\\.ts$", message: `${layer} must not import the composition root.` },
           // The domain imports only its own files: no packages and no Node built-ins.
           ...(layer === "domain"
-            ? [{ regex: "^[^.]", message: "domain imports only relative domain files." }]
+            ? [{ regex: "^(?!#src/domain/)", message: "domain imports only domain files." }]
             : []),
         ],
       },
@@ -46,5 +54,6 @@ export default tseslint.config(
     },
   },
   { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
+  { rules: { "no-restricted-imports": ["error", { patterns: [NO_RELATIVE_IMPORTS] }] } },
   ...Object.entries(FORBIDDEN_IMPORTS).map(([layer, forbidden]) => layerRule(layer, forbidden)),
 );

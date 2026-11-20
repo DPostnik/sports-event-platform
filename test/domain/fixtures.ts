@@ -1,4 +1,4 @@
-import { parseCompetitorId, parseEventId, type CompetitorId, type EventId } from "../../src/domain/ids.ts";
+import { parseCompetitorId, parseEventId, type CompetitorId, type EventId } from "#src/domain/ids.ts";
 
 export function eventId(text: string): EventId {
   const parsed = parseEventId(text);

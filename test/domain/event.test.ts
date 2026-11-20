@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Event } from "../../src/domain/event.ts";
-import { EVENT_FIELDS } from "./fixtures.ts";
+import type { Event } from "#src/domain/event.ts";
+import { EVENT_FIELDS } from "#test/domain/fixtures.ts";
 
 // The lines under @ts-expect-error are checked by `npm run typecheck`: if one
 // of them ever compiles, the type check fails.

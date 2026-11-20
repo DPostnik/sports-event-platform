@@ -1,9 +1,9 @@
 import type { Kysely } from "kysely";
-import { createEvent } from "../../domain/create-event.ts";
-import type { Event } from "../../domain/event.ts";
-import { parseCompetitorId, parseEventId } from "../../domain/ids.ts";
-import type { Database } from "./database.ts";
-import { createEventRepository } from "./event-repository.ts";
+import { createEvent } from "#src/domain/create-event.ts";
+import type { Event } from "#src/domain/event.ts";
+import { parseCompetitorId, parseEventId } from "#src/domain/ids.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
 
 // ADR-0027: sports and competitors are reference data. The API does not
 // create them, so the seed does. The IDs are fixed: the README lists them, and

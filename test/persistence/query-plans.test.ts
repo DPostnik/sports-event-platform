@@ -1,9 +1,9 @@
 import { sql, type Explainable, type Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Database } from "../../src/infrastructure/persistence/database.ts";
-import { buildFindByIdQuery, buildListQuery } from "../../src/infrastructure/persistence/event-repository.ts";
-import { competitorId, eventId } from "../domain/fixtures.ts";
-import { startTestDatabase, type TestDatabase } from "./support/database.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { buildFindByIdQuery, buildListQuery } from "#src/infrastructure/persistence/event-repository.ts";
+import { competitorId, eventId } from "#test/domain/fixtures.ts";
+import { startTestDatabase, type TestDatabase } from "#test/persistence/support/database.ts";
 
 // ADR-0013 calls its index table "a design claim until measured". These tests
 // measure it: they fill the tables, ask PostgreSQL for the plan of each

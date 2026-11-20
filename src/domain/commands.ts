@@ -1,6 +1,6 @@
-import type { Event, EventStatus } from "./event.ts";
-import { isPhaseOfSport } from "./phases.ts";
-import { err, ok, type Result } from "./result.ts";
+import type { Event, EventStatus } from "#src/domain/event.ts";
+import { isPhaseOfSport } from "#src/domain/phases.ts";
+import { err, ok, type Result } from "#src/domain/result.ts";
 
 // ADR-0010: an event changes only through these six commands. Each carries
 // its own input and the version the writer read (ADR-0009).

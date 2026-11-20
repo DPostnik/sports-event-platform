@@ -1,4 +1,4 @@
-import { err, ok, type Result } from "./result.ts";
+import { err, ok, type Result } from "#src/domain/result.ts";
 
 // The key of the brand. `declare` means it exists only for the compiler: no
 // JavaScript is produced for it, and no code can create or read the field.

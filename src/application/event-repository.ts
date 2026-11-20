@@ -1,7 +1,7 @@
-import type { Competitor } from "../domain/create-event.ts";
-import type { Event, EventStatus } from "../domain/event.ts";
-import type { CompetitorId, EventId } from "../domain/ids.ts";
-import type { EventView } from "./event-view.ts";
+import type { Competitor } from "#src/domain/create-event.ts";
+import type { Event, EventStatus } from "#src/domain/event.ts";
+import type { CompetitorId, EventId } from "#src/domain/ids.ts";
+import type { EventView } from "#src/application/event-view.ts";
 
 export interface CreateResult {
   // The stored event: the new one, or the earlier one for a repeated create.

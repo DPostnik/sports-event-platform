@@ -1,9 +1,9 @@
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Database } from "../../src/infrastructure/persistence/database.ts";
-import { createEventRepository } from "../../src/infrastructure/persistence/event-repository.ts";
-import { seed } from "../../src/infrastructure/persistence/seed.ts";
-import { startTestDatabase, type TestDatabase } from "./support/database.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import { createEventRepository } from "#src/infrastructure/persistence/event-repository.ts";
+import { seed } from "#src/infrastructure/persistence/seed.ts";
+import { startTestDatabase, type TestDatabase } from "#test/persistence/support/database.ts";
 
 let testDatabase: TestDatabase | undefined;
 let db: Kysely<Database>;

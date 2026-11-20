@@ -1,10 +1,10 @@
 import type { Kysely } from "kysely";
 import { Migrator, type Migration } from "kysely/migration";
-import type { Database } from "./database.ts";
-import * as sportsAndCompetitors from "./migrations/0001-sports-and-competitors.ts";
-import * as events from "./migrations/0002-events.ts";
-import * as eventCompetitors from "./migrations/0003-event-competitors.ts";
-import * as readIndexes from "./migrations/0004-read-indexes.ts";
+import type { Database } from "#src/infrastructure/persistence/database.ts";
+import * as sportsAndCompetitors from "#src/infrastructure/persistence/migrations/0001-sports-and-competitors.ts";
+import * as events from "#src/infrastructure/persistence/migrations/0002-events.ts";
+import * as eventCompetitors from "#src/infrastructure/persistence/migrations/0003-event-competitors.ts";
+import * as readIndexes from "#src/infrastructure/persistence/migrations/0004-read-indexes.ts";
 
 // A fixed list instead of a directory scan: the compiler checks that every
 // migration file exports `up` and `down`. The keys set the order.

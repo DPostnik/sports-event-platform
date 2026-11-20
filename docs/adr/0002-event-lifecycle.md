@@ -1,6 +1,6 @@
 # ADR-0002: Event status lifecycle
 
-Status: Accepted
+Status: Accepted, amended by [ADR-0030](0030-domain-decides-commands.md)
 
 Date: 2026-11-19
 

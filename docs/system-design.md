@@ -1,6 +1,6 @@
 # System Design
 
-Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md). All open questions of version 1 are closed.
+Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [ADR-0002](adr/0002-event-lifecycle.md), [ADR-0003](adr/0003-sports-and-competitors.md), [ADR-0004](adr/0004-sport-specific-phase.md), [ADR-0005](adr/0005-time-in-utc.md), [ADR-0006](adr/0006-identifiers.md), [ADR-0007](adr/0007-source-identity.md), [ADR-0008](adr/0008-ingestion-boundary.md), [ADR-0009](adr/0009-optimistic-concurrency.md), [ADR-0010](adr/0010-write-commands.md), [ADR-0011](adr/0011-read-queries.md), [ADR-0012](adr/0012-cursor-pagination.md), [ADR-0013](adr/0013-indexes.md), [ADR-0014](adr/0014-cache-freshness.md), [ADR-0015](adr/0015-shared-cache.md), [ADR-0016](adr/0016-failure-modes.md), [ADR-0017](adr/0017-rest-api.md), [ADR-0018](adr/0018-error-format.md), [ADR-0019](adr/0019-response-shape.md), [ADR-0020](adr/0020-change-propagation.md), [ADR-0021](adr/0021-implementation-boundary.md), [ADR-0022](adr/0022-postgresql.md), [ADR-0023](adr/0023-kysely.md), [ADR-0024](adr/0024-fastify.md), [ADR-0025](adr/0025-zod.md), [ADR-0026](adr/0026-test-tools.md), [ADR-0027](adr/0027-names-in-event-responses.md), [ADR-0028](adr/0028-source-ownership-needs-authentication.md), [ADR-0029](adr/0029-list-page-size-parameter.md), [ADR-0030](adr/0030-domain-decides-commands.md). All open questions of version 1 are closed.
 
 ## Scope of this version
 
@@ -100,9 +100,10 @@ sequenceDiagram
 
 1. The writer reads the event and learns its version.
 2. The API receives one of the six commands with `expectedVersion`.
-3. One conditional statement applies the write only if the transition is allowed by the [event lifecycle](#event-lifecycle) and `expectedVersion` equals the stored version.
-4. On success, the version advances by 1. After the commit, the API deletes the cache entry of the event.
-5. On a version mismatch, the API refuses the change with a conflict that carries the current version. The writer reads again and decides again.
+3. The API reads the event. The domain checks `expectedVersion` and the [event lifecycle](#event-lifecycle) and returns the new event or an error.
+4. One statement writes the new event only if the stored version still equals `expectedVersion` ([ADR-0030](adr/0030-domain-decides-commands.md)).
+5. On success, the version advances by 1. After the commit, the API deletes the cache entry of the event.
+6. On a version mismatch, the API refuses the change with a conflict that carries the current version. The writer reads again and decides again.
 
 The rule is the same for every writer, see [ADR-0009](adr/0009-optimistic-concurrency.md).
 
@@ -288,5 +289,6 @@ Not built, in short: provider adapters, reconciliation, change events, match act
 | 13 | Closed by [ADR-0027](adr/0027-names-in-event-responses.md). ~~How a consumer gets the names of the sport and the competitors, and how that reference data is created.~~ | A consumer cannot show "Salzburg vs. Sturm" from IDs alone. |
 | 14 | Closed by [ADR-0028](adr/0028-source-ownership-needs-authentication.md). ~~Who may change an event: how the rule "a source changes only its own events" is enforced.~~ | Without authentication the rule of ADR-0007 is a convention, not a guarantee. |
 | 15 | Closed by [ADR-0029](adr/0029-list-page-size-parameter.md). ~~How a consumer chooses the page size of the list, and what happens to the cache key.~~ | The maximum of ADR-0012 is unusable without a parameter, and the cache key must tell page sizes apart. |
+| 16 | Closed by [ADR-0030](adr/0030-domain-decides-commands.md). ~~Where the lifecycle rules run: in the conditional SQL statement, in the domain, or in both.~~ | Rules written twice can drift apart. |
 
 Each question was closed by its own commit that added a decision record under `docs/adr/` and updated this document. New questions found during implementation are added here and closed the same way.

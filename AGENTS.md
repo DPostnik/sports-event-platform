@@ -51,7 +51,7 @@ Import rules, enforced by the linter:
 ## Persistence
 
 - Schema changes are migrations. Constraints and indexes are explicit SQL with a comment that names the ADR.
-- A change to an existing event is one conditional statement (ADR-0009). No read-then-write in application code.
+- A change to an existing event is read, decided by the domain, and written by one statement that is conditional on the version (ADR-0009, ADR-0030). The SQL does not repeat lifecycle rules.
 - Each use case that writes runs in one explicit transaction.
 - Rows are validated in the mapper before they become domain objects.
 

@@ -11,34 +11,63 @@ Version 1 plus accepted decisions: [ADR-0001](adr/0001-load-assumptions.md), [AD
 
 ## Components
 
+Two diagrams separate what this repository builds from what a production setup adds ([ADR-0021](adr/0021-implementation-boundary.md)).
+
+### What is built
+
+```mermaid
+flowchart LR
+    Writers[Writers] --> API[API service]
+    Readers[Readers] --> API
+    API --> Cache[("Shared cache")]
+    API --> DB[("Relational database")]
+```
+
+- Writers: systems that create and change matches. An operator tool, or the reconciliation component upstream.
+- Readers: web, mobile and internal services that read matches.
+- API service: one stateless service. It can run as several identical instances.
+- Shared cache: holds read results for all instances. Redis, behind a cache port ([ADR-0015](adr/0015-shared-cache.md)).
+- Relational database: the source of truth for matches. PostgreSQL ([ADR-0022](adr/0022-postgresql.md)).
+
+### Target for production
+
+Everything outside the box "Built" is described and not built.
+
 ```mermaid
 flowchart LR
     Providers[Providers] --> Adapters
-    subgraph Upstream["Upstream - described, not built"]
+    subgraph Upstream["Upstream"]
         Adapters["Adapters (one per provider)"] --> Recon[Reconciliation]
     end
     Recon --> LB
-    Web[Web clients] --> LB[Load balancer]
-    Mobile[Mobile clients] --> LB
-    Internal[Internal services] --> LB
-    LB --> API1[API instance 1]
-    LB --> API2[API instance 2]
-    LB --> APIN[API instance N]
-    API1 --> Cache[("Shared cache")]
-    API2 --> Cache
-    APIN --> Cache
-    API1 --> DB[("Relational database")]
-    API2 --> DB
-    APIN --> DB
+    Operators[Operator tools] --> LB
+    Readers[Readers] --> CDN[CDN]
+    CDN --> LB[Load balancer]
+    subgraph Built["Built"]
+        API["API service (N instances)"]
+        Cache[("Shared cache")]
+        DB[("Primary database")]
+        API --> Cache
+        API --> DB
+    end
+    LB --> API
+    DB -.-> Replicas[("Read replicas")]
+    DB -.-> Standby[("Standby database")]
+    API -.-> Replicas
+    DB -.-> Relay[Outbox relay]
+    Relay -.-> Stream[Change event stream]
+    Stream -.-> Subscribers[Subscribers]
+    Actions[Match-actions service] -.-> LB
 ```
 
-- Consumers: web, mobile and internal services that read and change matches.
-- Adapters: one small component per provider. Each converts the provider format into the canonical format. Described, not built.
-- Reconciliation: decides whether records from different providers are the same real match, and whose data wins. Described, not built.
+- Adapters: one small component per provider. Each converts the provider format into the canonical format ([ADR-0008](adr/0008-ingestion-boundary.md)).
+- Reconciliation: decides whether records from different providers are the same real match, and whose data wins ([ADR-0008](adr/0008-ingestion-boundary.md)).
+- CDN: serves list pages for up to 60 seconds and asks the service before each reuse of one event ([ADR-0039](adr/0039-revalidation-and-weak-etags.md)).
 - Load balancer: spreads requests across the API instances.
-- API service: one service, run as several identical instances.
-- Shared cache: holds read results for all instances. Redis, behind a cache port ([ADR-0015](adr/0015-shared-cache.md)).
-- Relational database: the source of truth for matches. PostgreSQL ([ADR-0022](adr/0022-postgresql.md)).
+- Read replicas: take list reads when the primary database is the limit ([ADR-0001](adr/0001-load-assumptions.md)).
+- Standby database: takes over when the primary fails. The cache serves reads during the switch ([ADR-0016](adr/0016-failure-modes.md)).
+- Outbox relay and change event stream: each write stores a row that describes the change in the same transaction. The relay publishes the rows to a stream ([ADR-0020](adr/0020-change-propagation.md)).
+- Match-actions service: a neighbouring service for goals, cards, score and statistics. It refers to matches by the event ID of this service and reads them through the API ([ADR-0010](adr/0010-write-commands.md)).
 
 ## Request flows
 
